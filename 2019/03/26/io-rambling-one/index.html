@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="java,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="几个概念User space &amp;amp;&amp;amp; Kernel space A modern computer operating system usually segregates virtual memory into kernel space and user space.Primarily, this separation serves to provide memory protect">
+<meta name="keywords" content="java">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IO漫谈之IO模型（一）">
+<meta property="og:url" content="http://yoursite.com/2019/03/26/io-rambling-one/index.html">
+<meta property="og:site_name" content="olderwei">
+<meta property="og:description" content="几个概念User space &amp;amp;&amp;amp; Kernel space A modern computer operating system usually segregates virtual memory into kernel space and user space.Primarily, this separation serves to provide memory protect">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/IO%E8%BF%87%E7%A8%8B_1.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E9%98%BB%E5%A1%9E%E5%BC%8FIO.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E9%9D%9E%E9%98%BB%E5%A1%9E%E5%BC%8FIO.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20IO%E5%A4%8D%E7%94%A8.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E4%BF%A1%E5%8F%B7%E9%A9%B1%E5%8A%A8%E5%BC%8FIO.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E5%BC%82%E6%AD%A5IO.png">
+<meta property="og:image" content="http://yoursite.com/2019/03/26/io-rambling-one/IO%E6%A8%A1%E5%9E%8B%E6%AF%94%E8%BE%83.png">
+<meta property="og:updated_time" content="2019-03-26T12:16:05.787Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="IO漫谈之IO模型（一）">
+<meta name="twitter:description" content="几个概念User space &amp;amp;&amp;amp; Kernel space A modern computer operating system usually segregates virtual memory into kernel space and user space.Primarily, this separation serves to provide memory protect">
+<meta name="twitter:image" content="http://yoursite.com/2019/03/26/io-rambling-one/IO%E8%BF%87%E7%A8%8B_1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/03/26/io-rambling-one/">
+
+
+
+
+
+  <title>IO漫谈之IO模型（一） | olderwei</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">olderwei</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">yoyo</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/03/26/io-rambling-one/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenwei">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="olderwei">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">IO漫谈之IO模型（一）</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-26T19:36:00+08:00">
+                2019-03-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i> 浏览
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>次
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h4 id="几个概念"><a href="#几个概念" class="headerlink" title="几个概念"></a>几个概念</h4><h5 id="User-space-amp-amp-Kernel-space"><a href="#User-space-amp-amp-Kernel-space" class="headerlink" title="User space &amp;&amp; Kernel space"></a>User space &amp;&amp; Kernel space</h5><blockquote>
+<p>A modern computer <a href="https://en.wikipedia.org/wiki/Operating_system" target="_blank" rel="noopener">operating system</a> usually segregates <a href="https://en.wikipedia.org/wiki/Virtual_memory" target="_blank" rel="noopener">virtual memory</a> into <strong>kernel space</strong> and <strong>user space</strong>.Primarily, this separation serves to provide <a href="https://en.wikipedia.org/wiki/Memory_protection" target="_blank" rel="noopener">memory protection</a> and hardware protection from malicious or errant software behaviour.</p>
+<p>Kernel space is strictly reserved for running a privileged <a href="https://en.wikipedia.org/wiki/Operating_system_kernel" target="_blank" rel="noopener">operating system kernel</a>, kernel extensions, and most <a href="https://en.wikipedia.org/wiki/Device_driver" target="_blank" rel="noopener">device drivers</a>. In contrast, user space is the memory area where <a href="https://en.wikipedia.org/wiki/Application_software" target="_blank" rel="noopener">application software</a> and some drivers execute.</p>
+</blockquote>
+<p>以上是来自维基的解释，简单点说就是kernel space是操作系统的运行空间，user space是用户程序的运行空间。kernel space可以执行任何命令，调用系统的一切资源；user space只能执行简单的运算，不能调用系统资源，必须通过系统接口，才能向内核发出执行指令。</p>
+<h5 id="File-descriptor"><a href="#File-descriptor" class="headerlink" title="File descriptor"></a>File descriptor</h5><blockquote>
+<p>文件描述符在形式上是一个非负整数。实际上，它是一个索引值，指向<a href="https://zh.wikipedia.org/wiki/%E5%86%85%E6%A0%B8" target="_blank" rel="noopener">内核</a>为每一个<a href="https://zh.wikipedia.org/wiki/%E8%BF%9B%E7%A8%8B" target="_blank" rel="noopener">进程</a>所维护的该进程打开文件的记录表。当程序打开一个现有文件或者创建一个新文件时，内核向进程返回一个文件描述符。在<a href="https://zh.wikipedia.org/wiki/%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1" target="_blank" rel="noopener">程序设计</a>中，一些涉及底层的程序编写往往会围绕着文件描述符展开。但是文件描述符这一概念往往只适用于<a href="https://zh.wikipedia.org/wiki/UNIX" target="_blank" rel="noopener">UNIX</a>、<a href="https://zh.wikipedia.org/wiki/Linux" target="_blank" rel="noopener">Linux</a>这样的操作系统。</p>
+</blockquote>
+<p>以上是来自维基百科的解释</p>
+<h4 id="IO-模型"><a href="#IO-模型" class="headerlink" title="IO 模型"></a>IO 模型</h4><p>对于Linux系统而言，所有设备都是文件，其中包括磁盘、内存、网卡、键盘等等，对所有这些文件的访问都属于IO。针对所有的IO对象，可以将IO大致分为三类：网络IO、磁盘IO和内存IO，而通常我们说的是前两种。</p>
+<p>关于标准的IO，也即缓存IO，我们可以看下面这张图：</p>
+<p><img src="/2019/03/26/io-rambling-one/IO%E8%BF%87%E7%A8%8B_1.png" alt></p>
+<p>我们可以看到读过程分为<code>两个阶段</code>：</p>
+<blockquote>
+<p>等待数据准备，也就是数据从磁盘拷贝到内核空间</p>
+<p>将数据从内核拷贝到进程中，也就是将数据从内核空间拷贝到用户空间</p>
+</blockquote>
+<p>相应的写过程也分为两阶段，可以参看上图。这两个阶段很重要，因为接下来我们要讨论的IO模型的区别就是在这两阶段上各有不同。</p>
+<p>在Unix/Linux系统中，一共比较了5种IO模型：</p>
+<ul>
+<li>阻塞式IO</li>
+<li>非阻塞式IO</li>
+<li>IO复用</li>
+<li>信号驱动IO</li>
+<li>异步IO</li>
+</ul>
+<h5 id="阻塞式IO"><a href="#阻塞式IO" class="headerlink" title="阻塞式IO"></a>阻塞式IO</h5><p><img src="/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E9%98%BB%E5%A1%9E%E5%BC%8FIO.png" alt="Linux IO模型 - 阻塞式IO"></p>
+<p>当用户进程调用了recvfrom这个系统调用，kernel就开始了IO的第一个阶段：准备数据，如数据从磁盘拷贝到操作系统内核空间。这个过程需要等待，也就是说数据被拷贝到操作系统内核的缓冲区中是需要一个过程的。而在用户进程这边，整个进程会被阻塞。当kernel一直等到数据准备好了，它就会将数据从kernel中拷贝到用户空间，然后kernel返回结果，用户进程才解除block的状态，重新运行起来。</p>
+<blockquote>
+<p>阻塞式IO的特点就是在IO执行的两个阶段都被block了</p>
+</blockquote>
+<h5 id="非阻塞式IO"><a href="#非阻塞式IO" class="headerlink" title="非阻塞式IO"></a>非阻塞式IO</h5><p><img src="/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E9%9D%9E%E9%98%BB%E5%A1%9E%E5%BC%8FIO.png" alt="Linux IO模型 - 非阻塞式IO"></p>
+<p>当用户进程调用了recvfrom这个系统调用，如果kernel数据还没有准备好，那么recvfrom会立刻返回一个EWOULDBLOCK错误。用户进程收到EWOULDBLOCK之后，不会进入阻塞状态，而是循环发起recvfrom操作直到数据就绪。当数据就绪，用户进程此时进入阻塞状态，等待系统将数据从kernel中复制到用户空间，复制完成后kernel返回结果，用户进程解除block的状态，重新运行起来。</p>
+<blockquote>
+<p>非阻塞式IO的特点就是用户进程需要不断的主动询问</p>
+</blockquote>
+<h5 id="IO多路复用"><a href="#IO多路复用" class="headerlink" title="IO多路复用"></a>IO多路复用</h5><p><img src="/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20IO%E5%A4%8D%E7%94%A8.png" alt="Linux IO模型 - IO复用"></p>
+<p>当用户进程调用了select，那么整个进程会被block，而同时，kernel会“监视”所有select负责的socket，当任何一个socket中的数据准备好了，select就会返回。这个时候用户进程再调用recvfrom操作，将数据从kernel拷贝到用户进程。</p>
+<p>上面的同步阻塞、同步非阻塞，每次只能处理单个连接IO。当同时要处理很多个耗时短的IO，多路复用IO就擅长这个，我们所说的select，poll，epoll都属于多路复用IO。多路复用IO主要改进在单个进程就可以同时处理多个IO，上图以select为例。</p>
+<blockquote>
+<p>I/O 多路复用的特点是通过一种机制让一个进程能同时等待多个文件描述符，而这些文件描述符其中的任意一个进入读就绪状态，select()函数就可以返回。</p>
+</blockquote>
+<h5 id="信号驱动IO"><a href="#信号驱动IO" class="headerlink" title="信号驱动IO"></a>信号驱动IO</h5><p><img src="/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E4%BF%A1%E5%8F%B7%E9%A9%B1%E5%8A%A8%E5%BC%8FIO.png" alt="Linux IO模型 - 信号驱动式IO"></p>
+<p>信号驱动IO相当于同步非阻塞的升级版。用户进程调用read命令，系统在准备数据时，用户进程不会被阻塞，可以同时做其他任务，不需要循环去问系统数据是否准备就绪。当数据准备好之后，系统通知用户进程。但在数据从内核空间复制到用户空间这阶段，此时用户进程处于阻塞状态。</p>
+<h5 id="异步IO"><a href="#异步IO" class="headerlink" title="异步IO"></a>异步IO</h5><p><img src="/2019/03/26/io-rambling-one/Linux%20IO%E6%A8%A1%E5%9E%8B%20-%20%E5%BC%82%E6%AD%A5IO.png" alt="Linux IO模型 - 异步IO"></p>
+<p>用户进程发起read操作之后，立刻就可以开始去做其它的事。而另一方面，从kernel的角度，当它受到一个asynchronous read之后，首先它会立刻返回，所以不会对用户进程产生任何block。然后，kernel会等待数据准备完成，然后将数据拷贝到用户内存，当这一切都完成之后，kernel会给用户进程发送一个signal，告诉它read操作完成了。</p>
+<blockquote>
+<p>异步IO的特点就是IO执行的两个阶段都不会block</p>
+</blockquote>
+<h5 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h5><p>阻塞IO和非阻塞IO的区别在哪里？</p>
+<p>阻塞IO会一直block住对应的进程直到read操作完成，而非阻塞IO在kernel还未把数据准备好的情况下就返回了。</p>
+<blockquote>
+<p>阻塞和非阻塞就是上面所说的第一阶段，即在数据被拷贝到内核空间前，用户进程是否等待。如果用户进程是等待的，就是阻塞，如果用户进程是立即返回，就是非阻塞。</p>
+</blockquote>
+<p>同步IO和异步IO的区别在哪里？</p>
+<p>在说明synchronous IO和asynchronous IO的区别之前，需要先给出两者的定义。POSIX的定义是这样子的：</p>
+<blockquote>
+<p>A synchronous I/O operation causes the requesting process to be blocked until that I/O operation completes;</p>
+<p>An asynchronous I/O operation does not cause the requesting process to be blocked;</p>
+</blockquote>
+<p>两者的区别就在于同步IO做<code>IO operation</code>的时候会将process阻塞。按照这个定义，之前所述的阻塞 IO，非阻塞IO，IO多路复用都属于同步IO。</p>
+<p>有人会说，非阻塞IO并没有被block啊。这里有个非常“狡猾”的地方，定义中所指的<code>IO operation</code>是指真实的IO操作，就是例子中的recvfrom这个系统调用。非阻塞IO在执行recvfrom这个系统调用的时候，如果kernel的数据没有准备好，这时候不会block进程。但是，当kernel中数据准备好的时候，recvfrom会将数据从kernel拷贝到用户内存中，这个时候进程是被block了，在这段时间内，进程是被block的。</p>
+<p>而异步IO则不一样，当进程发起IO 操作之后，就直接返回再也不理睬了，直到kernel发送一个信号，告诉进程说IO完成。在这整个过程中，进程完全没有被block。</p>
+<blockquote>
+<p>同步和异步说就是上面所说的第二阶段，即数据从内核空间复制到用户进程空间，这时用户进程是否处于等待状态，如果是用户进程需要等待，即为同步，否则为异步。</p>
+</blockquote>
+<p>各个IO模型的比较如下图所示： </p>
+<p><img src="/2019/03/26/io-rambling-one/IO%E6%A8%A1%E5%9E%8B%E6%AF%94%E8%BE%83.png" alt="IO模型比较"></p>
+<p>通过上面的图片，可以发现非阻塞IO和异步 IO的区别还是很明显的。在非阻塞IO中，虽然进程大部分时间都不会被block，但是它仍然要求进程去主动的check，并且当数据准备完成以后，也需要进程主动的再次调用recvfrom来将数据拷贝到用户内存。而异步IO则完全不同。它就像是用户进程将整个IO操作交给了他人（kernel）完成，然后他人做完后发信号通知。在此期间，用户进程不需要去检查IO操作的状态，也不需要主动的去拷贝数据。</p>
+<h4 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h4><p><a href="https://my.oschina.net/ericquan8/blog/1836953" target="_blank" rel="noopener">Linux IO解读</a><br><a href="https://itimetraveler.github.io/2018/05/15/%E3%80%90Java%E3%80%91NIO%E7%9A%84%E7%90%86%E8%A7%A3/" target="_blank" rel="noopener">【Java】NIO的原理与浅析</a><br><a href="https://my.oschina.net/ericquan8/blog/1836953" target="_blank" rel="noopener">Linux IO解读</a><br><a href="https://www.jianshu.com/p/aed6067eeac9" target="_blank" rel="noopener">聊聊同步、异步、阻塞与非阻塞</a><br><a href="https://www.jianshu.com/p/486b0965c296" target="_blank" rel="noopener">聊聊Linux 五种IO模型</a><br><a href="https://blog.csdn.net/historyasamirror/article/details/5778378" target="_blank" rel="noopener">IO - 同步，异步，阻塞，非阻塞 （亡羊补牢篇)</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/java/" rel="tag"># java</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/03/19/connetion-pool/" rel="next" title="连接池那些事儿">
+                <i class="fa fa-chevron-left"></i> 连接池那些事儿
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/avatar.png" alt="chenwei">
+            
+              <p class="site-author-name" itemprop="name">chenwei</p>
+              <p class="site-description motion-element" itemprop="description">。。。</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#几个概念"><span class="nav-number">1.</span> <span class="nav-text">几个概念</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#User-space-amp-amp-Kernel-space"><span class="nav-number">1.1.</span> <span class="nav-text">User space &amp;&amp; Kernel space</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#File-descriptor"><span class="nav-number">1.2.</span> <span class="nav-text">File descriptor</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#IO-模型"><span class="nav-number">2.</span> <span class="nav-text">IO 模型</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#阻塞式IO"><span class="nav-number">2.1.</span> <span class="nav-text">阻塞式IO</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#非阻塞式IO"><span class="nav-number">2.2.</span> <span class="nav-text">非阻塞式IO</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#IO多路复用"><span class="nav-number">2.3.</span> <span class="nav-text">IO多路复用</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#信号驱动IO"><span class="nav-number">2.4.</span> <span class="nav-text">信号驱动IO</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#异步IO"><span class="nav-number">2.5.</span> <span class="nav-text">异步IO</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#总结"><span class="nav-number">2.6.</span> <span class="nav-text">总结</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#参考资料"><span class="nav-number">3.</span> <span class="nav-text">参考资料</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenwei</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i> 访问人数
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i> 总访问量
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      次
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
