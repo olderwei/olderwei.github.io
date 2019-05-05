@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Java,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="InetAddress.getLocalHost()深入分析背景​    最近我们一个线上的Spring boot应用启动特别慢，达到六七分钟，但是在测试环境启动很正常，基本上30秒左右，而且测试环境的配置比线上低很多。经过一天的排查对比分析，解决方案是在机器的/etc/hosts文件中配置IP与主机名的映射，但是为什么会造成这种情况就不得而知了，所以在后面深入分析了一下原因。 问题原因​">
+<meta name="keywords" content="Java">
+<meta property="og:type" content="article">
+<meta property="og:title" content="InetAddress.getLocalHost()深入分析">
+<meta property="og:url" content="http://yoursite.com/2019/04/23/inetadress-slowly/index.html">
+<meta property="og:site_name" content="olderwei">
+<meta property="og:description" content="InetAddress.getLocalHost()深入分析背景​    最近我们一个线上的Spring boot应用启动特别慢，达到六七分钟，但是在测试环境启动很正常，基本上30秒左右，而且测试环境的配置比线上低很多。经过一天的排查对比分析，解决方案是在机器的/etc/hosts文件中配置IP与主机名的映射，但是为什么会造成这种情况就不得而知了，所以在后面深入分析了一下原因。 问题原因​">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-05-05T14:30:33.433Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="InetAddress.getLocalHost()深入分析">
+<meta name="twitter:description" content="InetAddress.getLocalHost()深入分析背景​    最近我们一个线上的Spring boot应用启动特别慢，达到六七分钟，但是在测试环境启动很正常，基本上30秒左右，而且测试环境的配置比线上低很多。经过一天的排查对比分析，解决方案是在机器的/etc/hosts文件中配置IP与主机名的映射，但是为什么会造成这种情况就不得而知了，所以在后面深入分析了一下原因。 问题原因​">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/04/23/inetadress-slowly/">
+
+
+
+
+
+  <title>InetAddress.getLocalHost()深入分析 | olderwei</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">olderwei</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">yoyo</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/04/23/inetadress-slowly/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenwei">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="olderwei">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">InetAddress.getLocalHost()深入分析</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-04-23T22:46:19+08:00">
+                2019-04-23
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index">
+                    <span itemprop="name">Java</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i> 浏览
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>次
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="InetAddress-getLocalHost-深入分析"><a href="#InetAddress-getLocalHost-深入分析" class="headerlink" title="InetAddress.getLocalHost()深入分析"></a>InetAddress.getLocalHost()深入分析</h3><h4 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h4><p>​    最近我们一个线上的Spring boot应用启动特别慢，达到六七分钟，但是在测试环境启动很正常，基本上30秒左右，而且测试环境的配置比线上低很多。经过一天的排查对比分析，解决方案是在机器的/etc/hosts文件中配置IP与主机名的映射，但是为什么会造成这种情况就不得而知了，所以在后面深入分析了一下原因。</p>
+<h4 id="问题原因"><a href="#问题原因" class="headerlink" title="问题原因"></a>问题原因</h4><p>​    从启动日志上来看基本上都是在有网络调用的地方耗时比较长，比如启动的时候会连接zookeeper以及mysql等组件，又结合修改/etc/hosts配置文件能够解决问题，所以怀疑是不是解析主机名的时候出现了问题。所以写了一段测试代码，如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DemoApplication</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//#1</span></span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			<span class="keyword">long</span> begin = System.currentTimeMillis();</span><br><span class="line">			InetAddress hostName = InetAddress.getLocalHost();</span><br><span class="line">			System.out.println(hostName.getHostName() + <span class="string">" : "</span> + hostName.getHostAddress());</span><br><span class="line">			System.out.println(<span class="string">"It takes "</span> + (System.currentTimeMillis() - begin) + <span class="string">" ms"</span>);</span><br><span class="line">		&#125; <span class="keyword">catch</span> (UnknownHostException e) &#123;</span><br><span class="line">			e.printStackTrace();</span><br><span class="line">		&#125;</span><br><span class="line">        <span class="comment">//#2</span></span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			<span class="keyword">long</span> begin = System.currentTimeMillis();</span><br><span class="line">			InetAddress hostName = InetAddress.getLocalHost();</span><br><span class="line">			System.out.println(hostName.getHostName() + <span class="string">" : "</span> + hostName.getHostAddress());</span><br><span class="line">			System.out.println(<span class="string">"It takes "</span> + (System.currentTimeMillis() - begin) + <span class="string">" ms"</span>);</span><br><span class="line">		&#125; <span class="keyword">catch</span> (UnknownHostException e) &#123;</span><br><span class="line">			e.printStackTrace();</span><br><span class="line">		&#125;</span><br><span class="line">        <span class="comment">//#3</span></span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			<span class="keyword">long</span> begin = System.currentTimeMillis();</span><br><span class="line">			InetAddress hostName = InetAddress.getByName(<span class="string">"主机名"</span>);</span><br><span class="line">			System.out.println(hostName.getHostName() + <span class="string">" : "</span> + hostName.getHostAddress());</span><br><span class="line">			System.out.println(<span class="string">"It takes "</span> + (System.currentTimeMillis() - begin) + <span class="string">" ms"</span>);</span><br><span class="line">		&#125; <span class="keyword">catch</span> (UnknownHostException e) &#123;</span><br><span class="line">			e.printStackTrace();</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>​    将这段程序放在线上机器执行，执行结果如下：</p>
+<blockquote>
+<p>It takes 19665 ms<br>It takes 14832 ms<br>It takes 0 ms</p>
+</blockquote>
+<p>​    其实很容易看出InetAddress.getLocalHost()这个方法肯定是有问题的，但是#3这段代码我是直接用InetAddress.getByName(“主机名”);会很快。接着对InetAddress.getLocalHost()和InetAddress.getByName(“主机名”)的源码进行debug，大家可以看到这两个方法都会走到InetAddress.getAddressesFromNameService方法，这个方法里有一个比较重要的是addresses = nameService.lookupAllHostAddr(host); 而这个方法最终会调用Inet4AddressImpl里的<code>public native InetAddress[]   lookupAllHostAddr(String hostname) throws UnknownHostException;</code> 但是InetAddress.getLocalHost()方法在之前有这么一段处理String local = impl.getLocalHostName();取主机名，最终调用的是Inet4AddressImpl里的<code>public native String getLocalHostName() throws UnknownHostException;</code> 所以我们初步定位就是getLocalHostName这个native方法耗时了。 这一块说的比较绕，且没有贴出源码，相信大家只要会debug都能把这个调用关系梳理清楚。</p>
+<p>​    但是走到这里我们是不是线索就断了呢，因为最终调用native方法我们debug不了，不知道getLocalHostName这个方法究竟做了什么。别急，我们还有终极武器，从OpenJDK中寻求真相。大家可以从<a href="http://hg.openjdk.java.net/jdk8" target="_blank" rel="noopener">http://hg.openjdk.java.net/jdk8</a> 这里下载源码，然后找到我们想要的方法，在/src/solaris/native/java/net这里能找到Inet4AddressImpl的实现（基本上Linux平台相关的代码都在solaris目录下），我们找到getLocalHostName的实现，如下所示：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">JNIEXPORT jstring JNICALL</span><br><span class="line">Java_java_net_Inet4AddressImpl_getLocalHostName(JNIEnv *env, jobject <span class="keyword">this</span>) &#123;</span><br><span class="line">    <span class="keyword">char</span> hostname[NI_MAXHOST+<span class="number">1</span>];</span><br><span class="line"></span><br><span class="line">    hostname[<span class="number">0</span>] = <span class="string">'\0'</span>;</span><br><span class="line">    <span class="comment">//#1</span></span><br><span class="line">    <span class="keyword">if</span> (JVM_GetHostName(hostname, NI_MAXHOST)) &#123;</span><br><span class="line">        <span class="comment">/* Something went wrong, maybe networking is not setup? */</span></span><br><span class="line">        <span class="built_in">strcpy</span>(hostname, <span class="string">"localhost"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">         struct addrinfo  hints, *res;</span><br><span class="line">         <span class="keyword">int</span> error;</span><br><span class="line"></span><br><span class="line">         <span class="built_in">memset</span>(&amp;hints, <span class="number">0</span>, <span class="keyword">sizeof</span>(hints));</span><br><span class="line">         hints.ai_flags = AI_CANONNAME;</span><br><span class="line">         hints.ai_family = AF_UNSPEC;</span><br><span class="line">		</span><br><span class="line">         <span class="comment">//#2</span></span><br><span class="line">         error = getaddrinfo(hostname, <span class="literal">NULL</span>, &amp;hints, &amp;res);</span><br><span class="line"></span><br><span class="line">         <span class="keyword">if</span> (error == <span class="number">0</span>) &#123;</span><br><span class="line">             <span class="comment">/* host is known to name service */</span></span><br><span class="line">             <span class="comment">//#3</span></span><br><span class="line">             error = getnameinfo(res-&gt;ai_addr,</span><br><span class="line">                                 res-&gt;ai_addrlen,</span><br><span class="line">                                 hostname,</span><br><span class="line">                                 NI_MAXHOST,</span><br><span class="line">                                 <span class="literal">NULL</span>,</span><br><span class="line">                                 <span class="number">0</span>,</span><br><span class="line">                                 NI_NAMEREQD);</span><br><span class="line"></span><br><span class="line">             <span class="comment">/* if getnameinfo fails hostname is still the value</span></span><br><span class="line"><span class="comment">                from gethostname */</span></span><br><span class="line"></span><br><span class="line">             freeaddrinfo(res);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> (*env)-&gt;NewStringUTF(env, hostname);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>​    基本上分为3步，第一步获取主机名，也就是#1的部分，这块是调了JVM的GetHostName方法，这个方法最终会调用到gethostname这个系统函数；第二步#2是根据主机名获取IP，getaddrinfo是linux的系统函数；第三步#3是根据ip获取主机名或者域名，getnameinfo也是linux的系统函数。所以耗时应该是这三个环节中的某一个出现了问题。我们把这一段C代码放在linux来运行，所以我写了下面这段测试方法testGethostname.c，编译gcc testGethostname.c -o testGethostname。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;netdb.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">char</span> hostname[<span class="number">1025</span>];</span><br><span class="line"></span><br><span class="line">    hostname[<span class="number">0</span>] = <span class="string">'\0'</span>;</span><br><span class="line">    gethostname(hostname, <span class="number">1024</span>);</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">addrinfo</span> <span class="title">hints</span>, *<span class="title">res</span>;</span></span><br><span class="line">    <span class="keyword">int</span> error;</span><br><span class="line"></span><br><span class="line">    hostname[<span class="number">1025</span>] = <span class="string">'\0'</span>;</span><br><span class="line">    <span class="built_in">memset</span>(&amp;hints, <span class="number">0</span>, <span class="keyword">sizeof</span>(hints));</span><br><span class="line">    hints.ai_flags = AI_CANONNAME;</span><br><span class="line">    hints.ai_family = AF_INET;</span><br><span class="line"></span><br><span class="line">    error = getaddrinfo(hostname, <span class="literal">NULL</span>, &amp;hints, &amp;res);</span><br><span class="line"></span><br><span class="line">  	<span class="comment">//#3</span></span><br><span class="line">    <span class="keyword">if</span> (error == <span class="number">0</span>) &#123;</span><br><span class="line">        getnameinfo(res-&gt;ai_addr,</span><br><span class="line">                    res-&gt;ai_addrlen,</span><br><span class="line">                    hostname,</span><br><span class="line">                    NI_MAXHOST,</span><br><span class="line">                    <span class="literal">NULL</span>,</span><br><span class="line">                    <span class="number">0</span>,</span><br><span class="line">                    NI_NUMERICHOST);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">        freeaddrinfo(res);</span><br><span class="line">    &#125; </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>​    运行过程还是会比较慢，所以我把三步分别进行注释，当把#3后面的代码注释掉的时候，程序运行起来就很快了。追到这里，其实就知道了是getnameinfo这个耗时，getnameinfo官方解释是it       converts a socket address to a corresponding host and service，其实就是将相应的socket地址转换成主机名和域名。这里为什么会耗时呢。我也没有再去跟getnameinfo这个是怎么实现的，因为发现了一个比较好用的工具strace，在Linux用来跟踪系统调用。所以我执行了strace ./testGethostname，结果如下，没有截取完整：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">connect(<span class="number">3</span>, &#123;sa_family=AF_INET, sin_port=htons(<span class="number">53</span>), sin_addr=inet_addr(<span class="string">"180.76.76.76"</span>)&#125;, <span class="number">16</span>) = <span class="number">0</span></span><br><span class="line">poll([&#123;fd=<span class="number">3</span>, events=POLLOUT&#125;], <span class="number">1</span>, <span class="number">0</span>)    = <span class="number">1</span> ([&#123;fd=<span class="number">3</span>, revents=POLLOUT&#125;])</span><br><span class="line">sendto(<span class="number">3</span>, <span class="string">"\227\21\1\0\0\1\0\0\242\7in-add"</span>..., <span class="number">43</span>, MSG_NOSIGNAL, <span class="literal">NULL</span>, <span class="number">0</span>) = <span class="number">43</span></span><br><span class="line">poll([&#123;fd=<span class="number">3</span>, events=POLLIN&#125;], <span class="number">1</span>, <span class="number">5000</span>)  = <span class="number">0</span> (Timeout)</span><br><span class="line">socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_IP) = <span class="number">4</span></span><br><span class="line">connect(<span class="number">4</span>, &#123;sa_family=AF_INET, sin_port=htons(<span class="number">53</span>), sin_addr=inet_addr(<span class="string">"219.141.136.10"</span>)&#125;, <span class="number">16</span>) = <span class="number">0</span></span><br><span class="line">poll([&#123;fd=<span class="number">4</span>, events=POLLOUT&#125;], <span class="number">1</span>, <span class="number">0</span>)    = <span class="number">1</span> ([&#123;fd=<span class="number">4</span>, revents=POLLOUT&#125;])</span><br><span class="line">sendto(<span class="number">4</span>, <span class="string">"\227\21\1\0\0\1\0\0\0\0\2\7in-add"</span>..., <span class="number">43</span>, MSG_NOSIGNAL, <span class="literal">NULL</span>, <span class="number">0</span>) = <span class="number">43</span></span><br><span class="line">poll([&#123;fd=<span class="number">4</span>, events=POLLIN&#125;], <span class="number">1</span>, <span class="number">3000</span>)  = <span class="number">0</span> (Timeout)</span><br><span class="line">socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_IP) = <span class="number">5</span></span><br><span class="line">connect(<span class="number">5</span>, &#123;sa_family=AF_INET, sin_port=htons(<span class="number">53</span>), sin_addr=inet_addr(<span class="string">"223.5.5.5"</span>)&#125;, <span class="number">16</span>) = <span class="number">0</span></span><br><span class="line">poll([&#123;fd=<span class="number">5</span>, events=POLLOUT&#125;], <span class="number">1</span>, <span class="number">0</span>)    = <span class="number">1</span> ([&#123;fd=<span class="number">5</span>, revents=POLLOUT&#125;])</span><br><span class="line">sendto(<span class="number">5</span>, <span class="string">"\227\21\1\0\0\1\0\0\0\0\0\0\00242\7in-add"</span>..., <span class="number">43</span>, MSG_NOSIGNAL, <span class="literal">NULL</span>, <span class="number">0</span>) = <span class="number">43</span></span><br><span class="line">poll([&#123;fd=<span class="number">5</span>, events=POLLIN&#125;], <span class="number">1</span>, <span class="number">6000</span>)  = <span class="number">0</span> (Timeout)</span><br><span class="line">poll([&#123;fd=<span class="number">3</span>, events=POLLOUT&#125;], <span class="number">1</span>, <span class="number">0</span>)    = <span class="number">1</span> ([&#123;fd=<span class="number">3</span>, revents=POLLOUT&#125;])</span><br><span class="line">sendto(<span class="number">3</span>, <span class="string">"\227\21\1\0\0\1\0\0\0\0\0\0\003\7in-add"</span>..., <span class="number">43</span>, MSG_NOSIGNAL, <span class="literal">NULL</span>, <span class="number">0</span>) = <span class="number">43</span></span><br><span class="line">poll([&#123;fd=<span class="number">3</span>, events=POLLIN&#125;], <span class="number">1</span>, <span class="number">5000</span>)  = <span class="number">0</span> (Timeout)</span><br><span class="line">poll([&#123;fd=<span class="number">4</span>, events=POLLOUT&#125;], <span class="number">1</span>, <span class="number">0</span>)    = <span class="number">1</span> ([&#123;fd=<span class="number">4</span>, revents=POLLOUT&#125;])</span><br><span class="line">sendto(<span class="number">4</span>, <span class="string">"\227\21\1\0\0\1\0\0\0\0\0\0\062\00242\7in-add"</span>..., <span class="number">43</span>, MSG_NOSIGNAL, <span class="literal">NULL</span>, <span class="number">0</span>) = <span class="number">43</span></span><br><span class="line">poll([&#123;fd=<span class="number">4</span>, events=POLLIN&#125;], <span class="number">1</span>, <span class="number">3000</span>)  = <span class="number">1</span> ([&#123;fd=<span class="number">4</span>, revents=POLLIN&#125;])</span><br><span class="line">ioctl(<span class="number">4</span>, FIONREAD, [<span class="number">43</span>])                = <span class="number">0</span></span><br><span class="line">recvfrom(<span class="number">4</span>, <span class="string">"\227\21\201\202\0\1\0\0\0\0\0\0\00310\7in-add"</span>..., <span class="number">1024</span>, <span class="number">0</span>, &#123;sa_family=AF_INET, sin_port=htons(<span class="number">53</span>), sin_addr=inet_addr(<span class="string">"219.141.136.10"</span>)&#125;, [<span class="number">16</span>]) = <span class="number">43</span></span><br></pre></td></tr></table></figure>
+<p>​    从这个结果中可以看到这里会在DNS服务器（因为我们的机器在/etc/resolv.conf中配置了三个域名服务器）去查IP对应的host，而且都是Timeout，这里其实也就找到最终原因了，就是这里耗时。分析到这里也就结束了。</p>
+<h4 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h4><p>​    上面虽然分析了过程，但也有几个问题需要说一下。</p>
+<p>​    1、名称的解析顺序是怎样的呢？</p>
+<p>​    答案在/etc/nsswitch.conf配置文件中的“hosts”配置，centos7一般配置为files dns myhostname，而centos一般配置为files dns myhostname，files就是/etc/hosts文件，dns就是通过dns服务器进行解析，myhostname 只返回本机配置的公共IP地址，具体解释参<a href="https://www.unix.com/man-page/centos/8/nss-myhostname/" target="_blank" rel="noopener">https://www.unix.com/man-page/centos/8/nss-myhostname/</a></p>
+<p>​    2、getnameinfo这个函数为什么会这么慢？</p>
+<p>​    因为getnameinfo会走到DNS解析，只不过是通过IP解析成host，也即域名的反向解析（你可以执行一下）。因为我们机器配置的第一个公共IP是一个外网IP，而用nslookup [外网ip]测了一下，DNS Server会返回SERVFAIL，也有connection time out，但如果用nslookup [内网ip]，DNS Server会很快返回NXDOMAIN。所以这个和DNS内部实现又关系，具体的还没看。</p>
+<h4 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h4><p>​    这次问题排查前前后后花了大概一周的时间，从这中间也学了很多东西，从JVM到Linux到C语言，是一段比较艰辛的过程，希望这是一次新的开始。</p>
+<h4 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h4><p><a href="https://www.unix.com/man-page/centos/8/nss-myhostname/" target="_blank" rel="noopener">nss-myhostname</a><br><a href="http://man7.org/linux/man-pages/man3/getnameinfo.3.html" target="_blank" rel="noopener">getnameinfo</a><br><a href="http://man7.org/linux/man-pages/man3/getaddrinfo.3.html" target="_blank" rel="noopener">getaddrinfo</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Java/" rel="tag"># Java</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/04/18/rocketmq-producer-one/" rel="next" title="RocketMQ消息发送流程源码分析">
+                <i class="fa fa-chevron-left"></i> RocketMQ消息发送流程源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/avatar.png" alt="chenwei">
+            
+              <p class="site-author-name" itemprop="name">chenwei</p>
+              <p class="site-description motion-element" itemprop="description">。。。</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">6</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#InetAddress-getLocalHost-深入分析"><span class="nav-number">1.</span> <span class="nav-text">InetAddress.getLocalHost()深入分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#背景"><span class="nav-number">1.1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#问题原因"><span class="nav-number">1.2.</span> <span class="nav-text">问题原因</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#问题"><span class="nav-number">1.3.</span> <span class="nav-text">问题</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#总结"><span class="nav-number">1.4.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#参考资料"><span class="nav-number">1.5.</span> <span class="nav-text">参考资料</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenwei</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i> 访问人数
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i> 总访问量
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      次
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
