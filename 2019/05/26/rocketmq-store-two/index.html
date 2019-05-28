@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="RocketMQ,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="本篇主要分析ConsumeQueue和IndexFile的构建过程。ConsumeQueue主要是供消息消费者使用的，IndexFile主要是消息查询时使用的。 ConsumeQueue的构建首先我们看ReputMessageService，ReputMessageService在DefaultMessageStore启动的时候启动。 ReputMessageService123456789101">
+<meta name="keywords" content="RocketMQ">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RocketMQ消息存储流程源码分析(二)">
+<meta property="og:url" content="http://yoursite.com/2019/05/26/rocketmq-store-two/index.html">
+<meta property="og:site_name" content="olderwei">
+<meta property="og:description" content="本篇主要分析ConsumeQueue和IndexFile的构建过程。ConsumeQueue主要是供消息消费者使用的，IndexFile主要是消息查询时使用的。 ConsumeQueue的构建首先我们看ReputMessageService，ReputMessageService在DefaultMessageStore启动的时候启动。 ReputMessageService123456789101">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://yoursite.com/2019/05/26/rocketmq-store-two/data/blog/source/_posts/rocketmq-store-two/indexFile.jpg">
+<meta property="og:updated_time" content="2019-05-28T14:20:26.050Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RocketMQ消息存储流程源码分析(二)">
+<meta name="twitter:description" content="本篇主要分析ConsumeQueue和IndexFile的构建过程。ConsumeQueue主要是供消息消费者使用的，IndexFile主要是消息查询时使用的。 ConsumeQueue的构建首先我们看ReputMessageService，ReputMessageService在DefaultMessageStore启动的时候启动。 ReputMessageService123456789101">
+<meta name="twitter:image" content="http://yoursite.com/2019/05/26/rocketmq-store-two/data/blog/source/_posts/rocketmq-store-two/indexFile.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/05/26/rocketmq-store-two/">
+
+
+
+
+
+  <title>RocketMQ消息存储流程源码分析(二) | olderwei</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">olderwei</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">yoyo</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/05/26/rocketmq-store-two/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenwei">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="olderwei">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">RocketMQ消息存储流程源码分析(二)</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-05-26T21:50:59+08:00">
+                2019-05-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/RocketMQ/" itemprop="url" rel="index">
+                    <span itemprop="name">RocketMQ</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i> 浏览
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>次
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本篇主要分析ConsumeQueue和IndexFile的构建过程。ConsumeQueue主要是供消息消费者使用的，IndexFile主要是消息查询时使用的。</p>
+<h3 id="ConsumeQueue的构建"><a href="#ConsumeQueue的构建" class="headerlink" title="ConsumeQueue的构建"></a>ConsumeQueue的构建</h3><p>首先我们看ReputMessageService，ReputMessageService在DefaultMessageStore启动的时候启动。</p>
+<h4 id="ReputMessageService"><a href="#ReputMessageService" class="headerlink" title="ReputMessageService"></a>ReputMessageService</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 构造ConsumerQueue和IndexQueue的线程</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ReputMessageService</span> <span class="keyword">extends</span> <span class="title">ServiceThread</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">long</span> reputFromOffset = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">long</span> <span class="title">getReputFromOffset</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> reputFromOffset;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setReputFromOffset</span><span class="params">(<span class="keyword">long</span> reputFromOffset)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.reputFromOffset = reputFromOffset;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">shutdown</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">50</span> &amp;&amp; <span class="keyword">this</span>.isCommitLogAvailable(); i++) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                Thread.sleep(<span class="number">100</span>);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException ignored) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.isCommitLogAvailable()) &#123;</span><br><span class="line">            log.warn(<span class="string">"shutdown ReputMessageService, but commitlog have not finish to be dispatched, CL: &#123;&#125; reputFromOffset: &#123;&#125;"</span>,</span><br><span class="line">                DefaultMessageStore.<span class="keyword">this</span>.commitLog.getMaxOffset(), <span class="keyword">this</span>.reputFromOffset);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">super</span>.shutdown();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">long</span> <span class="title">behind</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> DefaultMessageStore.<span class="keyword">this</span>.commitLog.getMaxOffset() - <span class="keyword">this</span>.reputFromOffset;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">isCommitLogAvailable</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.reputFromOffset &lt; DefaultMessageStore.<span class="keyword">this</span>.commitLog.getMaxOffset();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">doReput</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">boolean</span> doNext = <span class="keyword">true</span>; <span class="keyword">this</span>.isCommitLogAvailable() &amp;&amp; doNext; ) &#123;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (DefaultMessageStore.<span class="keyword">this</span>.getMessageStoreConfig().isDuplicationEnable()</span><br><span class="line">                &amp;&amp; <span class="keyword">this</span>.reputFromOffset &gt;= DefaultMessageStore.<span class="keyword">this</span>.getConfirmOffset()) &#123;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">//从commitLog中获取reputFromOffset对应的mappedFile对应的mappedByteBuffer，且size为mappedByteBuffer的wrotePosition或者是commitPosition减去reputFromOffset，也即写到ByteBuffer且还没构建的消息，包含多条消息</span></span><br><span class="line">            SelectMappedBufferResult result = DefaultMessageStore.<span class="keyword">this</span>.commitLog.getData(reputFromOffset);</span><br><span class="line">            <span class="keyword">if</span> (result != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    <span class="keyword">this</span>.reputFromOffset = result.getStartOffset();</span><br><span class="line"></span><br><span class="line">                    <span class="comment">//循环读取消息</span></span><br><span class="line">                    <span class="keyword">for</span> (<span class="keyword">int</span> readSize = <span class="number">0</span>; readSize &lt; result.getSize() &amp;&amp; doNext; ) &#123;</span><br><span class="line">                        <span class="comment">//从mappedByteBuffer中读取消息并封装成DispatchRequest进行返回</span></span><br><span class="line">                        DispatchRequest dispatchRequest =</span><br><span class="line">                            DefaultMessageStore.<span class="keyword">this</span>.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), <span class="keyword">false</span>, <span class="keyword">false</span>);</span><br><span class="line">                        <span class="keyword">int</span> size = dispatchRequest.getMsgSize();</span><br><span class="line"></span><br><span class="line">                        <span class="keyword">if</span> (dispatchRequest.isSuccess()) &#123;</span><br><span class="line">                            <span class="keyword">if</span> (size &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                                <span class="comment">//调用CommitLogDispatcherBuildConsumeQueue和CommitLogDispatcherBuildIndex构建ConsumeQueue和Index</span></span><br><span class="line">                                DefaultMessageStore.<span class="keyword">this</span>.doDispatch(dispatchRequest);</span><br><span class="line"></span><br><span class="line">                                <span class="comment">//TODO 长轮询相关，后续分析</span></span><br><span class="line">                                <span class="keyword">if</span> (BrokerRole.SLAVE != DefaultMessageStore.<span class="keyword">this</span>.getMessageStoreConfig().getBrokerRole()</span><br><span class="line">                                    &amp;&amp; DefaultMessageStore.<span class="keyword">this</span>.brokerConfig.isLongPollingEnable()) &#123;</span><br><span class="line">                                    DefaultMessageStore.<span class="keyword">this</span>.messageArrivingListener.arriving(dispatchRequest.getTopic(),</span><br><span class="line">                                        dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + <span class="number">1</span>,</span><br><span class="line">                                        dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),</span><br><span class="line">                                        dispatchRequest.getBitMap(), dispatchRequest.getPropertiesMap());</span><br><span class="line">                                &#125;</span><br><span class="line">                                <span class="comment">//reputFromOffset进行累加</span></span><br><span class="line">                                <span class="keyword">this</span>.reputFromOffset += size;</span><br><span class="line">                                readSize += size;</span><br><span class="line">                                <span class="keyword">if</span> (DefaultMessageStore.<span class="keyword">this</span>.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE) &#123;</span><br><span class="line">                                    DefaultMessageStore.<span class="keyword">this</span>.storeStatsService</span><br><span class="line">                                        .getSinglePutMessageTopicTimesTotal(dispatchRequest.getTopic()).incrementAndGet();</span><br><span class="line">                                    DefaultMessageStore.<span class="keyword">this</span>.storeStatsService</span><br><span class="line">                                        .getSinglePutMessageTopicSizeTotal(dispatchRequest.getTopic())</span><br><span class="line">                                        .addAndGet(dispatchRequest.getMsgSize());</span><br><span class="line">                                &#125;</span><br><span class="line">                                <span class="comment">//TODO 什么场景下回走这个逻辑？消息size为0？</span></span><br><span class="line">                            &#125; <span class="keyword">else</span> <span class="keyword">if</span> (size == <span class="number">0</span>) &#123;</span><br><span class="line">                                <span class="keyword">this</span>.reputFromOffset = DefaultMessageStore.<span class="keyword">this</span>.commitLog.rollNextFile(<span class="keyword">this</span>.reputFromOffset);</span><br><span class="line">                                readSize = result.getSize();</span><br><span class="line">                            &#125;</span><br><span class="line">                        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!dispatchRequest.isSuccess()) &#123;</span><br><span class="line">                            <span class="keyword">if</span> (size &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                                log.error(<span class="string">"[BUG]read total count not equals msg total size. reputFromOffset=&#123;&#125;"</span>, reputFromOffset);</span><br><span class="line">                                <span class="keyword">this</span>.reputFromOffset += size;</span><br><span class="line">                            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                                doNext = <span class="keyword">false</span>;</span><br><span class="line">                                <span class="keyword">if</span> (DefaultMessageStore.<span class="keyword">this</span>.brokerConfig.getBrokerId() == MixAll.MASTER_ID) &#123;</span><br><span class="line">                                    log.error(<span class="string">"[BUG]the master dispatch message to consume queue error, COMMITLOG OFFSET: &#123;&#125;"</span>,</span><br><span class="line">                                        <span class="keyword">this</span>.reputFromOffset);</span><br><span class="line"></span><br><span class="line">                                    <span class="keyword">this</span>.reputFromOffset += result.getSize() - readSize;</span><br><span class="line">                                &#125;</span><br><span class="line">                            &#125;</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">                    result.release();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                doNext = <span class="keyword">false</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        DefaultMessageStore.log.info(<span class="keyword">this</span>.getServiceName() + <span class="string">" service started"</span>);</span><br><span class="line">        <span class="keyword">while</span> (!<span class="keyword">this</span>.isStopped()) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">//1毫秒执行一次</span></span><br><span class="line">                Thread.sleep(<span class="number">1</span>);</span><br><span class="line">                <span class="keyword">this</span>.doReput();</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                DefaultMessageStore.log.warn(<span class="keyword">this</span>.getServiceName() + <span class="string">" service has exception. "</span>, e);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        DefaultMessageStore.log.info(<span class="keyword">this</span>.getServiceName() + <span class="string">" service end"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> String <span class="title">getServiceName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> ReputMessageService.class.getSimpleName();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="CommitLogDispatcherBuildConsumeQueue"><a href="#CommitLogDispatcherBuildConsumeQueue" class="headerlink" title="CommitLogDispatcherBuildConsumeQueue"></a>CommitLogDispatcherBuildConsumeQueue</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">CommitLogDispatcherBuildConsumeQueue</span> <span class="keyword">implements</span> <span class="title">CommitLogDispatcher</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">dispatch</span><span class="params">(DispatchRequest request)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> tranType = MessageSysFlag.getTransactionValue(request.getSysFlag());</span><br><span class="line">        <span class="keyword">switch</span> (tranType) &#123;</span><br><span class="line">            <span class="comment">//非事务消息或者是事务提交消息，执行putMessagePositionInfo即构建ConsumeQueue的逻辑</span></span><br><span class="line">            <span class="keyword">case</span> MessageSysFlag.TRANSACTION_NOT_TYPE:</span><br><span class="line">            <span class="keyword">case</span> MessageSysFlag.TRANSACTION_COMMIT_TYPE:</span><br><span class="line">                DefaultMessageStore.<span class="keyword">this</span>.putMessagePositionInfo(request);</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            <span class="keyword">case</span> MessageSysFlag.TRANSACTION_PREPARED_TYPE:</span><br><span class="line">            <span class="keyword">case</span> MessageSysFlag.TRANSACTION_ROLLBACK_TYPE:</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>DefaultMessageStore中的putMessagePositionInfo第一步会根据Topic和QueueId获取ConsumeQueue，然后在调用ConsumeQueue的putMessagePositionInfoWrapper进行写入操作，这部分代码我就不贴了，直接看ConsumeQueue。</p>
+<h4 id="ConsumeQueue"><a href="#ConsumeQueue" class="headerlink" title="ConsumeQueue"></a>ConsumeQueue</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ConsumeQueue</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">putMessagePositionInfoWrapper</span><span class="params">(DispatchRequest request)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> maxRetries = <span class="number">30</span>;</span><br><span class="line">        <span class="comment">//ConsumeQueue是否可写</span></span><br><span class="line">        <span class="keyword">boolean</span> canWrite = <span class="keyword">this</span>.defaultMessageStore.getRunningFlags().isCQWriteable();</span><br><span class="line">        <span class="comment">//重试30次</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; maxRetries &amp;&amp; canWrite; i++) &#123;</span><br><span class="line">            <span class="keyword">long</span> tagsCode = request.getTagsCode();</span><br><span class="line">            <span class="comment">//TODO ConsumeQueueExt.CqExtUnit消息过滤相关，暂不分析</span></span><br><span class="line">            <span class="keyword">if</span> (isExtWriteEnable()) &#123;</span><br><span class="line">                ConsumeQueueExt.CqExtUnit cqExtUnit = <span class="keyword">new</span> ConsumeQueueExt.CqExtUnit();</span><br><span class="line">                cqExtUnit.setFilterBitMap(request.getBitMap());</span><br><span class="line">                cqExtUnit.setMsgStoreTime(request.getStoreTimestamp());</span><br><span class="line">                cqExtUnit.setTagsCode(request.getTagsCode());</span><br><span class="line"></span><br><span class="line">                <span class="keyword">long</span> extAddr = <span class="keyword">this</span>.consumeQueueExt.put(cqExtUnit);</span><br><span class="line">                <span class="keyword">if</span> (isExtAddr(extAddr)) &#123;</span><br><span class="line">                    tagsCode = extAddr;</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    log.warn(<span class="string">"Save consume queue extend fail, So just save tagsCode! &#123;&#125;, topic:&#123;&#125;, queueId:&#123;&#125;, offset:&#123;&#125;"</span>, cqExtUnit,</span><br><span class="line">                        topic, queueId, request.getCommitLogOffset());</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">boolean</span> result = <span class="keyword">this</span>.putMessagePositionInfo(request.getCommitLogOffset(),</span><br><span class="line">                request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());</span><br><span class="line">            <span class="keyword">if</span> (result) &#123;</span><br><span class="line">                <span class="keyword">this</span>.defaultMessageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// <span class="doctag">XXX:</span> warn and notify me</span></span><br><span class="line">                log.warn(<span class="string">"[BUG]put commit log position info to "</span> + topic + <span class="string">":"</span> + queueId + <span class="string">" "</span> + request.getCommitLogOffset()</span><br><span class="line">                    + <span class="string">" failed, retry "</span> + i + <span class="string">" times"</span>);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">                &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">                    log.warn(<span class="string">""</span>, e);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        log.error(<span class="string">"[BUG]consume queue can not write, &#123;&#125; &#123;&#125;"</span>, <span class="keyword">this</span>.topic, <span class="keyword">this</span>.queueId);</span><br><span class="line">        <span class="keyword">this</span>.defaultMessageStore.getRunningFlags().makeLogicsQueueError();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">boolean</span> <span class="title">putMessagePositionInfo</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> offset, <span class="keyword">final</span> <span class="keyword">int</span> size, <span class="keyword">final</span> <span class="keyword">long</span> tagsCode,</span></span></span><br><span class="line"><span class="function"><span class="params">        <span class="keyword">final</span> <span class="keyword">long</span> cqOffset)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (offset &lt;= <span class="keyword">this</span>.maxPhysicOffset) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//将消息写入ByteBuffer，由ByteBuffer.allocate(CQ_STORE_UNIT_SIZE)分配</span></span><br><span class="line">        <span class="keyword">this</span>.byteBufferIndex.flip();</span><br><span class="line">        <span class="keyword">this</span>.byteBufferIndex.limit(CQ_STORE_UNIT_SIZE);</span><br><span class="line">        <span class="keyword">this</span>.byteBufferIndex.putLong(offset);</span><br><span class="line">        <span class="keyword">this</span>.byteBufferIndex.putInt(size);</span><br><span class="line">        <span class="keyword">this</span>.byteBufferIndex.putLong(tagsCode);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//计算出当前要写入消费队列也即ConsumeQueue的偏移量，由cqOffset * 20来算，由于ConsumeQueue中每个消息占用20个字节，cqOffset代表该消息在ConsumeQueue的位置</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">long</span> expectLogicOffset = cqOffset * CQ_STORE_UNIT_SIZE;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//根据expectLogicOffset获取最后一个MappedFile</span></span><br><span class="line">        MappedFile mappedFile = <span class="keyword">this</span>.mappedFileQueue.getLastMappedFile(expectLogicOffset);</span><br><span class="line">        <span class="keyword">if</span> (mappedFile != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (mappedFile.isFirstCreateInQueue() &amp;&amp; cqOffset != <span class="number">0</span> &amp;&amp; mappedFile.getWrotePosition() == <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">this</span>.minLogicOffset = expectLogicOffset;</span><br><span class="line">                <span class="keyword">this</span>.mappedFileQueue.setFlushedWhere(expectLogicOffset);</span><br><span class="line">                <span class="keyword">this</span>.mappedFileQueue.setCommittedWhere(expectLogicOffset);</span><br><span class="line">                <span class="keyword">this</span>.fillPreBlank(mappedFile, expectLogicOffset);</span><br><span class="line">                log.info(<span class="string">"fill pre blank space "</span> + mappedFile.getFileName() + <span class="string">" "</span> + expectLogicOffset + <span class="string">" "</span></span><br><span class="line">                    + mappedFile.getWrotePosition());</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (cqOffset != <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="comment">//验证前面算出来的当前要写入ConsumeQueue的偏移量和根据MappedFile算出的待写入的偏移量，如果相等，则进行写入操作，如果小于，则代表已经写过了，如果大于，则有问题</span></span><br><span class="line">                <span class="keyword">long</span> currentLogicOffset = mappedFile.getWrotePosition() + mappedFile.getFileFromOffset();</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (expectLogicOffset &lt; currentLogicOffset) &#123;</span><br><span class="line">                    log.warn(<span class="string">"Build  consume queue repeatedly, expectLogicOffset: &#123;&#125; currentLogicOffset: &#123;&#125; Topic: &#123;&#125; QID: &#123;&#125; Diff: &#123;&#125;"</span>,</span><br><span class="line">                        expectLogicOffset, currentLogicOffset, <span class="keyword">this</span>.topic, <span class="keyword">this</span>.queueId, expectLogicOffset - currentLogicOffset);</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (expectLogicOffset != currentLogicOffset) &#123;</span><br><span class="line">                    LOG_ERROR.warn(</span><br><span class="line">                        <span class="string">"[BUG]logic queue order maybe wrong, expectLogicOffset: &#123;&#125; currentLogicOffset: &#123;&#125; Topic: &#123;&#125; QID: &#123;&#125; Diff: &#123;&#125;"</span>,</span><br><span class="line">                        expectLogicOffset,</span><br><span class="line">                        currentLogicOffset,</span><br><span class="line">                        <span class="keyword">this</span>.topic,</span><br><span class="line">                        <span class="keyword">this</span>.queueId,</span><br><span class="line">                        expectLogicOffset - currentLogicOffset</span><br><span class="line">                    );</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">this</span>.maxPhysicOffset = offset;</span><br><span class="line">            <span class="comment">//将消息写入ConsumeQueue对应的mappedFile的FileChannel</span></span><br><span class="line">            <span class="keyword">return</span> mappedFile.appendMessage(<span class="keyword">this</span>.byteBufferIndex.array());</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//ConsumeQueue的ByteBuffer刷盘磁盘</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">flush</span><span class="params">(<span class="keyword">final</span> <span class="keyword">int</span> flushLeastPages)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">boolean</span> result = <span class="keyword">this</span>.mappedFileQueue.flush(flushLeastPages);</span><br><span class="line">        <span class="keyword">if</span> (isExtReadEnable()) &#123;</span><br><span class="line">            result = result &amp; <span class="keyword">this</span>.consumeQueueExt.flush(flushLeastPages);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上面只分析了ConsumeQueue写入ByteBuffer的过程，其实ConsumeQueue也有相应的文件存储，ConsumeQueue中的数据是什么时候刷到磁盘中的呢？在DefaultMessageStore创建的时候会创建FlushConsumeQueueService，这个线程会隔flushIntervalConsumeQueue进行刷盘操作，相关的逻辑请参看FlushConsumeQueueService。</p>
+<h3 id="IndexFile的构建"><a href="#IndexFile的构建" class="headerlink" title="IndexFile的构建"></a>IndexFile的构建</h3><h4 id="CommitLogDispatcherBuildIndex"><a href="#CommitLogDispatcherBuildIndex" class="headerlink" title="CommitLogDispatcherBuildIndex"></a>CommitLogDispatcherBuildIndex</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">CommitLogDispatcherBuildIndex</span> <span class="keyword">implements</span> <span class="title">CommitLogDispatcher</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">dispatch</span><span class="params">(DispatchRequest request)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//构建Index文件</span></span><br><span class="line">        <span class="keyword">if</span> (DefaultMessageStore.<span class="keyword">this</span>.messageStoreConfig.isMessageIndexEnable()) &#123;</span><br><span class="line">            DefaultMessageStore.<span class="keyword">this</span>.indexService.buildIndex(request);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="IndexService"><a href="#IndexService" class="headerlink" title="IndexService"></a>IndexService</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">IndexService</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">buildIndex</span><span class="params">(DispatchRequest req)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//获取并创建Index文件，并重试3次</span></span><br><span class="line">        IndexFile indexFile = retryGetAndCreateIndexFile();</span><br><span class="line">        <span class="keyword">if</span> (indexFile != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">long</span> endPhyOffset = indexFile.getEndPhyOffset();</span><br><span class="line">            DispatchRequest msg = req;</span><br><span class="line">            String topic = msg.getTopic();</span><br><span class="line">            String keys = msg.getKeys();</span><br><span class="line">            <span class="keyword">if</span> (msg.getCommitLogOffset() &lt; endPhyOffset) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">final</span> <span class="keyword">int</span> tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());</span><br><span class="line">            <span class="keyword">switch</span> (tranType) &#123;</span><br><span class="line">                <span class="keyword">case</span> MessageSysFlag.TRANSACTION_NOT_TYPE:</span><br><span class="line">                <span class="keyword">case</span> MessageSysFlag.TRANSACTION_PREPARED_TYPE:</span><br><span class="line">                <span class="keyword">case</span> MessageSysFlag.TRANSACTION_COMMIT_TYPE:</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                <span class="keyword">case</span> MessageSysFlag.TRANSACTION_ROLLBACK_TYPE:</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">//如果uniqKey也即消息唯一键不为空，则写到indexFile</span></span><br><span class="line">            <span class="keyword">if</span> (req.getUniqKey() != <span class="keyword">null</span>) &#123;</span><br><span class="line">                indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));</span><br><span class="line">                <span class="keyword">if</span> (indexFile == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    log.error(<span class="string">"putKey error commitlog &#123;&#125; uniqkey &#123;&#125;"</span>, req.getCommitLogOffset(), req.getUniqKey());</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">//为多个key构建索引，RocketMQ支持为同一个消息建立多个索引</span></span><br><span class="line">            <span class="keyword">if</span> (keys != <span class="keyword">null</span> &amp;&amp; keys.length() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                String[] keyset = keys.split(MessageConst.KEY_SEPARATOR);</span><br><span class="line">                <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; keyset.length; i++) &#123;</span><br><span class="line">                    String key = keyset[i];</span><br><span class="line">                    <span class="keyword">if</span> (key.length() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                        indexFile = putKey(indexFile, msg, buildKey(topic, key));</span><br><span class="line">                        <span class="keyword">if</span> (indexFile == <span class="keyword">null</span>) &#123;</span><br><span class="line">                            log.error(<span class="string">"putKey error commitlog &#123;&#125; uniqkey &#123;&#125;"</span>, req.getCommitLogOffset(), req.getUniqKey());</span><br><span class="line">                            <span class="keyword">return</span>;</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            log.error(<span class="string">"build index error, stop building index"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">private</span> IndexFile <span class="title">putKey</span><span class="params">(IndexFile indexFile, DispatchRequest msg, String idxKey)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//调用调用indexFile的putKey方法写入IndexFile，参看IndexFile类的分析</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">boolean</span> ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp()); !ok; ) &#123;</span><br><span class="line">            log.warn(<span class="string">"Index file ["</span> + indexFile.getFileName() + <span class="string">"] is full, trying to create another one"</span>);</span><br><span class="line">            <span class="comment">//如果文件写满了，则调用retryGetAndCreateIndexFile重新创建一个IndexFile进行写入</span></span><br><span class="line">            indexFile = retryGetAndCreateIndexFile();</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">null</span> == indexFile) &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            ok = indexFile.putKey(idxKey, msg.getCommitLogOffset(), msg.getStoreTimestamp());</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> indexFile;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> IndexFile <span class="title">retryGetAndCreateIndexFile</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        IndexFile indexFile = <span class="keyword">null</span>;</span><br><span class="line">        <span class="comment">//重试3次</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> times = <span class="number">0</span>; <span class="keyword">null</span> == indexFile &amp;&amp; times &lt; MAX_TRY_IDX_CREATE; times++) &#123;</span><br><span class="line">            <span class="comment">//</span></span><br><span class="line">            indexFile = <span class="keyword">this</span>.getAndCreateLastIndexFile();</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">null</span> != indexFile)</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                log.info(<span class="string">"Tried to create index file "</span> + times + <span class="string">" times"</span>);</span><br><span class="line">                Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line">                log.error(<span class="string">"Interrupted"</span>, e);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">null</span> == indexFile) &#123;</span><br><span class="line">            <span class="keyword">this</span>.defaultMessageStore.getAccessRights().makeIndexFileError();</span><br><span class="line">            log.error(<span class="string">"Mark index file cannot build flag"</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> indexFile;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//获取最后一个IndexFile或者创建一个新的IndexFile并加到indexFileList中</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> IndexFile <span class="title">getAndCreateLastIndexFile</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        IndexFile indexFile = <span class="keyword">null</span>;</span><br><span class="line">        IndexFile prevIndexFile = <span class="keyword">null</span>;</span><br><span class="line">        <span class="keyword">long</span> lastUpdateEndPhyOffset = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">long</span> lastUpdateIndexTimestamp = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">this</span>.readWriteLock.readLock().lock();</span><br><span class="line">            <span class="keyword">if</span> (!<span class="keyword">this</span>.indexFileList.isEmpty()) &#123;</span><br><span class="line">                <span class="comment">//取indexFileList的最后一个文件</span></span><br><span class="line">                IndexFile tmp = <span class="keyword">this</span>.indexFileList.get(<span class="keyword">this</span>.indexFileList.size() - <span class="number">1</span>);</span><br><span class="line">                <span class="comment">//如果租后一个文件没有写满，则将最后一个IndexFile返回</span></span><br><span class="line">                <span class="keyword">if</span> (!tmp.isWriteFull()) &#123;</span><br><span class="line">                    indexFile = tmp;</span><br><span class="line">                <span class="comment">//如果写满了，则创建一个新的indexFile，并将这个文件设置成prevIndexFile，启用一个新的线程进行刷盘，代码在@1</span></span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    lastUpdateEndPhyOffset = tmp.getEndPhyOffset();</span><br><span class="line">                    lastUpdateIndexTimestamp = tmp.getEndTimestamp();</span><br><span class="line">                    prevIndexFile = tmp;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">this</span>.readWriteLock.readLock().unlock();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//创建一个新的indexFile</span></span><br><span class="line">        <span class="keyword">if</span> (indexFile == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                String fileName =</span><br><span class="line">                    <span class="keyword">this</span>.storePath + File.separator</span><br><span class="line">                        + UtilAll.timeMillisToHumanString(System.currentTimeMillis());</span><br><span class="line">                indexFile =</span><br><span class="line">                    <span class="keyword">new</span> IndexFile(fileName, <span class="keyword">this</span>.hashSlotNum, <span class="keyword">this</span>.indexNum, lastUpdateEndPhyOffset,</span><br><span class="line">                        lastUpdateIndexTimestamp);</span><br><span class="line">                <span class="keyword">this</span>.readWriteLock.writeLock().lock();</span><br><span class="line">                <span class="keyword">this</span>.indexFileList.add(indexFile);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                log.error(<span class="string">"getLastIndexFile exception "</span>, e);</span><br><span class="line">            &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">                <span class="keyword">this</span>.readWriteLock.writeLock().unlock();</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (indexFile != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">//@1将上一个IndexFile进行刷盘</span></span><br><span class="line">                <span class="keyword">final</span> IndexFile flushThisFile = prevIndexFile;</span><br><span class="line">                Thread flushThread = <span class="keyword">new</span> Thread(<span class="keyword">new</span> Runnable() &#123;</span><br><span class="line">                    <span class="meta">@Override</span></span><br><span class="line">                    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                        IndexService.<span class="keyword">this</span>.flush(flushThisFile);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;, <span class="string">"FlushIndexFileThread"</span>);</span><br><span class="line"></span><br><span class="line">                flushThread.setDaemon(<span class="keyword">true</span>);</span><br><span class="line">                flushThread.start();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> indexFile;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="IndexFile"><a href="#IndexFile" class="headerlink" title="IndexFile"></a>IndexFile</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">IndexFile</span> </span>&#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 刷盘逻辑，由IndexService标记了@1处调用</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">flush</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">long</span> beginTime = System.currentTimeMillis();</span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.mappedFile.hold()) &#123;</span><br><span class="line">            <span class="keyword">this</span>.indexHeader.updateByteBuffer();</span><br><span class="line">            <span class="keyword">this</span>.mappedByteBuffer.force();</span><br><span class="line">            <span class="keyword">this</span>.mappedFile.release();</span><br><span class="line">            log.info(<span class="string">"flush index file eclipse time(ms) "</span> + (System.currentTimeMillis() - beginTime));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">putKey</span><span class="params">(<span class="keyword">final</span> String key, <span class="keyword">final</span> <span class="keyword">long</span> phyOffset, <span class="keyword">final</span> <span class="keyword">long</span> storeTimestamp)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//indexCount代表已Index条目列表当前已使用的个数，indexNum代表总共能存储index条目的个数，默认为2000万</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.indexHeader.getIndexCount() &lt; <span class="keyword">this</span>.indexNum) &#123;</span><br><span class="line">            <span class="comment">//计算key的hash值</span></span><br><span class="line">            <span class="keyword">int</span> keyHash = indexKeyHashMethod(key);</span><br><span class="line">            <span class="keyword">int</span> slotPos = keyHash % <span class="keyword">this</span>.hashSlotNum;</span><br><span class="line">            <span class="comment">//计算hash key在hash槽的位置</span></span><br><span class="line">            <span class="keyword">int</span> absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;</span><br><span class="line"></span><br><span class="line">            FileLock fileLock = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">//获取该hash槽存储的Index条目的索引，如果存在冲突，则会组成链表结构</span></span><br><span class="line">                <span class="keyword">int</span> slotValue = <span class="keyword">this</span>.mappedByteBuffer.getInt(absSlotPos);</span><br><span class="line">                <span class="keyword">if</span> (slotValue &lt;= invalidIndex || slotValue &gt; <span class="keyword">this</span>.indexHeader.getIndexCount()) &#123;</span><br><span class="line">                    slotValue = invalidIndex;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">//该消息存储时间与第一条消息的时间戳的差值</span></span><br><span class="line">                <span class="keyword">long</span> timeDiff = storeTimestamp - <span class="keyword">this</span>.indexHeader.getBeginTimestamp();</span><br><span class="line">                timeDiff = timeDiff / <span class="number">1000</span>;</span><br><span class="line">                <span class="keyword">if</span> (<span class="keyword">this</span>.indexHeader.getBeginTimestamp() &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">                    timeDiff = <span class="number">0</span>;</span><br><span class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span> (timeDiff &gt; Integer.MAX_VALUE) &#123;</span><br><span class="line">                    timeDiff = Integer.MAX_VALUE;</span><br><span class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span> (timeDiff &lt; <span class="number">0</span>) &#123;</span><br><span class="line">                    timeDiff = <span class="number">0</span>;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">//计算Index条目存储的位置</span></span><br><span class="line">                <span class="keyword">int</span> absIndexPos =</span><br><span class="line">                    IndexHeader.INDEX_HEADER_SIZE + <span class="keyword">this</span>.hashSlotNum * hashSlotSize</span><br><span class="line">                        + <span class="keyword">this</span>.indexHeader.getIndexCount() * indexSize;</span><br><span class="line"></span><br><span class="line">                <span class="comment">//存储index条目，包括key的hashcode，消息对应的物理偏移量，该消息存储时间与第一条消息的时间戳的差值，该条目的前一条条目的索引</span></span><br><span class="line">                <span class="keyword">this</span>.mappedByteBuffer.putInt(absIndexPos, keyHash);</span><br><span class="line">                <span class="keyword">this</span>.mappedByteBuffer.putLong(absIndexPos + <span class="number">4</span>, phyOffset);</span><br><span class="line">                <span class="keyword">this</span>.mappedByteBuffer.putInt(absIndexPos + <span class="number">4</span> + <span class="number">8</span>, (<span class="keyword">int</span>) timeDiff);</span><br><span class="line">                <span class="keyword">this</span>.mappedByteBuffer.putInt(absIndexPos + <span class="number">4</span> + <span class="number">8</span> + <span class="number">4</span>, slotValue);</span><br><span class="line"></span><br><span class="line">                <span class="comment">//将Index条目存储的索引写到hash槽</span></span><br><span class="line">                <span class="keyword">this</span>.mappedByteBuffer.putInt(absSlotPos, <span class="keyword">this</span>.indexHeader.getIndexCount());</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (<span class="keyword">this</span>.indexHeader.getIndexCount() &lt;= <span class="number">1</span>) &#123;</span><br><span class="line">                    <span class="keyword">this</span>.indexHeader.setBeginPhyOffset(phyOffset);</span><br><span class="line">                    <span class="keyword">this</span>.indexHeader.setBeginTimestamp(storeTimestamp);</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">//indexHeader的相关处理</span></span><br><span class="line">                <span class="keyword">this</span>.indexHeader.incHashSlotCount();</span><br><span class="line">                <span class="keyword">this</span>.indexHeader.incIndexCount();</span><br><span class="line">                <span class="keyword">this</span>.indexHeader.setEndPhyOffset(phyOffset);</span><br><span class="line">                <span class="keyword">this</span>.indexHeader.setEndTimestamp(storeTimestamp);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                log.error(<span class="string">"putKey exception, Key: "</span> + key + <span class="string">" KeyHashCode: "</span> + key.hashCode(), e);</span><br><span class="line">            &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">                <span class="keyword">if</span> (fileLock != <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="keyword">try</span> &#123;</span><br><span class="line">                        fileLock.release();</span><br><span class="line">                    &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">                        log.error(<span class="string">"Failed to release the lock"</span>, e);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            log.warn(<span class="string">"Over index file capacity: index count = "</span> + <span class="keyword">this</span>.indexHeader.getIndexCount()</span><br><span class="line">                + <span class="string">"; index max num = "</span> + <span class="keyword">this</span>.indexNum);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>index索引文件结构如下，上面的代码可以结合下面这张图一起看。</p>
+<p><img src="/2019/05/26/rocketmq-store-two/data/blog/source/_posts/rocketmq-store-two/indexFile.jpg" alt="indexFile"></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/RocketMQ/" rel="tag"># RocketMQ</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/05/06/rocketmq-store-one/" rel="next" title="RocketMQ消息存储流程源码分析(一)">
+                <i class="fa fa-chevron-left"></i> RocketMQ消息存储流程源码分析(一)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/avatar.png" alt="chenwei">
+            
+              <p class="site-author-name" itemprop="name">chenwei</p>
+              <p class="site-description motion-element" itemprop="description">。。。</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">6</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#ConsumeQueue的构建"><span class="nav-number">1.</span> <span class="nav-text">ConsumeQueue的构建</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#ReputMessageService"><span class="nav-number">1.1.</span> <span class="nav-text">ReputMessageService</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CommitLogDispatcherBuildConsumeQueue"><span class="nav-number">1.2.</span> <span class="nav-text">CommitLogDispatcherBuildConsumeQueue</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ConsumeQueue"><span class="nav-number">1.3.</span> <span class="nav-text">ConsumeQueue</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IndexFile的构建"><span class="nav-number">2.</span> <span class="nav-text">IndexFile的构建</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CommitLogDispatcherBuildIndex"><span class="nav-number">2.1.</span> <span class="nav-text">CommitLogDispatcherBuildIndex</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#IndexService"><span class="nav-number">2.2.</span> <span class="nav-text">IndexService</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#IndexFile"><span class="nav-number">2.3.</span> <span class="nav-text">IndexFile</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenwei</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i> 访问人数
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i> 总访问量
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      次
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
