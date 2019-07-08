@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Java,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="这两个异常在网络编程里应该是比较常见的，之前对于他们的理解只知道是对端关闭了连接，但什么情况下会报Broken pipe，什么情况下会报Connetion reset by peer是一无所知的，今天专门就这个问题做一个调研，下面记录下整个调研过程。 TCP的连接的建立与终止在讲具体原因之前，有必要说一下TCP的三次握手与四次挥手，下面用一张图来说明（图是网上找的）。  上面三条是连接的建立，也就">
+<meta name="keywords" content="Java">
+<meta property="og:type" content="article">
+<meta property="og:title" content="深入分析Broken pipe和Connetion reset by peer">
+<meta property="og:url" content="http://yoursite.com/2019/07/08/broken-pipe/index.html">
+<meta property="og:site_name" content="olderwei">
+<meta property="og:description" content="这两个异常在网络编程里应该是比较常见的，之前对于他们的理解只知道是对端关闭了连接，但什么情况下会报Broken pipe，什么情况下会报Connetion reset by peer是一无所知的，今天专门就这个问题做一个调研，下面记录下整个调研过程。 TCP的连接的建立与终止在讲具体原因之前，有必要说一下TCP的三次握手与四次挥手，下面用一张图来说明（图是网上找的）。  上面三条是连接的建立，也就">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://yoursite.com/2019/07/08/broken-pipe/data/blog/source/_posts/broken-pipe/tcp_hank.jpg">
+<meta property="og:updated_time" content="2019-07-08T09:40:01.794Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="深入分析Broken pipe和Connetion reset by peer">
+<meta name="twitter:description" content="这两个异常在网络编程里应该是比较常见的，之前对于他们的理解只知道是对端关闭了连接，但什么情况下会报Broken pipe，什么情况下会报Connetion reset by peer是一无所知的，今天专门就这个问题做一个调研，下面记录下整个调研过程。 TCP的连接的建立与终止在讲具体原因之前，有必要说一下TCP的三次握手与四次挥手，下面用一张图来说明（图是网上找的）。  上面三条是连接的建立，也就">
+<meta name="twitter:image" content="http://yoursite.com/2019/07/08/broken-pipe/data/blog/source/_posts/broken-pipe/tcp_hank.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/07/08/broken-pipe/">
+
+
+
+
+
+  <title>深入分析Broken pipe和Connetion reset by peer | olderwei</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">olderwei</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">yoyo</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/08/broken-pipe/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenwei">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="olderwei">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">深入分析Broken pipe和Connetion reset by peer</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-08T17:27:34+08:00">
+                2019-07-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index">
+                    <span itemprop="name">Java</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i> 浏览
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>次
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>这两个异常在网络编程里应该是比较常见的，之前对于他们的理解只知道是对端关闭了连接，但什么情况下会报Broken pipe，什么情况下会报Connetion reset by peer是一无所知的，今天专门就这个问题做一个调研，下面记录下整个调研过程。</p>
+<h4 id="TCP的连接的建立与终止"><a href="#TCP的连接的建立与终止" class="headerlink" title="TCP的连接的建立与终止"></a>TCP的连接的建立与终止</h4><p>在讲具体原因之前，有必要说一下TCP的三次握手与四次挥手，下面用一张图来说明（图是网上找的）。</p>
+<p><img src="/2019/07/08/broken-pipe/data/blog/source/_posts/broken-pipe/tcp_hank.jpg" alt="tcp_hank"></p>
+<p>上面三条是连接的建立，也就是说的三次挥手；下面四条是正常的连接终止，也就是四次挥手，关于为什么建立连接需要三次交互，而终止连接需要四次交互，这里不做过多解释，可以查询相关信息。正常关闭连接是发送FIN，还有一种异常关闭是发送RST，今天要讨论的就和这个有关系。</p>
+<h4 id="异常模拟"><a href="#异常模拟" class="headerlink" title="异常模拟"></a>异常模拟</h4><p>下面写了一段NIO的代码，Server端代码如下，代码很简单，看不懂的可以稍微补一点Nio的知识：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.io.IOException;</span><br><span class="line"><span class="keyword">import</span> java.net.InetSocketAddress;</span><br><span class="line"><span class="keyword">import</span> java.nio.ByteBuffer;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.SelectionKey;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.Selector;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.ServerSocketChannel;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.SocketChannel;</span><br><span class="line"><span class="keyword">import</span> java.util.Iterator;</span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.TimeUnit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NioServer</span> </span>&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</span><br><span class="line">		ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();</span><br><span class="line">		serverSocketChannel.socket().bind(<span class="keyword">new</span> InetSocketAddress(<span class="number">9000</span>));</span><br><span class="line">		serverSocketChannel.configureBlocking(<span class="keyword">false</span>);</span><br><span class="line">		Selector selector = Selector.open();</span><br><span class="line">		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">			<span class="keyword">int</span> selected = selector.select();</span><br><span class="line">			<span class="keyword">if</span> (selected &gt; <span class="number">0</span>) &#123;</span><br><span class="line">				Iterator&lt;SelectionKey&gt; iterator = selector.selectedKeys().iterator();</span><br><span class="line">				<span class="keyword">while</span> (iterator.hasNext()) &#123;</span><br><span class="line">					SelectionKey selectionKey = iterator.next();</span><br><span class="line">					iterator.remove();</span><br><span class="line">					<span class="keyword">if</span> (selectionKey.isAcceptable()) &#123;</span><br><span class="line">						System.err.println(<span class="string">"Acceptable"</span>);</span><br><span class="line">						SocketChannel socketChannel = serverSocketChannel.accept();</span><br><span class="line">						socketChannel.configureBlocking(<span class="keyword">false</span>);</span><br><span class="line">						socketChannel.register(selector, SelectionKey.OP_READ);</span><br><span class="line">					&#125; <span class="keyword">else</span> <span class="keyword">if</span> (selectionKey.isReadable()) &#123;</span><br><span class="line">						System.err.println(<span class="string">"Readable"</span>);</span><br><span class="line">						SocketChannel socketChannel = (SocketChannel) selectionKey.channel();</span><br><span class="line">						ByteBuffer buffer = ByteBuffer.allocate(<span class="number">128</span>);</span><br><span class="line">						socketChannel.read(buffer);</span><br><span class="line">						System.out.println(<span class="string">"接收来自客户端的数据："</span> + <span class="keyword">new</span> String(buffer.array()));</span><br><span class="line">						selectionKey.interestOps(SelectionKey.OP_WRITE);</span><br><span class="line">					&#125; <span class="keyword">else</span> <span class="keyword">if</span> (selectionKey.isWritable()) &#123;</span><br><span class="line">						System.err.println(<span class="string">"Writable"</span>);</span><br><span class="line">						TimeUnit.SECONDS.sleep(<span class="number">3</span>);</span><br><span class="line">						SocketChannel channel = (SocketChannel) selectionKey.channel();</span><br><span class="line">						String content = <span class="string">"向客户端发送数据 : "</span> + System.currentTimeMillis();</span><br><span class="line">						ByteBuffer bufferOne = ByteBuffer.wrap(content.getBytes());</span><br><span class="line">						channel.write(bufferOne); <span class="comment">//@1</span></span><br><span class="line">						System.err.println(<span class="string">"发送bufferOne"</span>);</span><br><span class="line">						TimeUnit.SECONDS.sleep(<span class="number">3</span>);</span><br><span class="line">						ByteBuffer bufferTwo = ByteBuffer.wrap(content.getBytes());</span><br><span class="line">						channel.write(bufferTwo); <span class="comment">//@2</span></span><br><span class="line">						System.err.println(<span class="string">"发送bufferTwo"</span>);</span><br><span class="line">						selectionKey.interestOps(SelectionKey.OP_READ);</span><br><span class="line">					&#125;</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>大家可以看到，在接收到客户端的数据以后，首先会往客户端写数据，在@1代码处，然后会再次往客户端写数据，在@2代码处。下面再看一下客户端的代码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.io.IOException;</span><br><span class="line"><span class="keyword">import</span> java.net.InetSocketAddress;</span><br><span class="line"><span class="keyword">import</span> java.nio.ByteBuffer;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.SelectionKey;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.Selector;</span><br><span class="line"><span class="keyword">import</span> java.nio.channels.SocketChannel;</span><br><span class="line"><span class="keyword">import</span> java.util.Iterator;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NioClient</span> </span>&#123;</span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">		SocketChannel socketChannel = SocketChannel.open();</span><br><span class="line"></span><br><span class="line">		socketChannel.configureBlocking(<span class="keyword">false</span>);</span><br><span class="line">		Selector selector = Selector.open();</span><br><span class="line">		socketChannel.register(selector, SelectionKey.OP_CONNECT);</span><br><span class="line">		socketChannel.connect(<span class="keyword">new</span> InetSocketAddress(<span class="string">"192.168.2.60"</span>, <span class="number">9000</span>));</span><br><span class="line">		<span class="comment">//socketChannel.socket().setSoLinger(true,0);  //@3</span></span><br><span class="line"></span><br><span class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">			<span class="keyword">int</span> select = selector.select();</span><br><span class="line">			<span class="keyword">if</span> (select &gt; <span class="number">0</span>) &#123;</span><br><span class="line">				Iterator&lt;SelectionKey&gt; iterator = selector.selectedKeys().iterator();</span><br><span class="line">				<span class="keyword">while</span> (iterator.hasNext()) &#123;</span><br><span class="line">					SelectionKey selectionKey = iterator.next();</span><br><span class="line">					<span class="keyword">if</span> (selectionKey.isConnectable()) &#123;</span><br><span class="line">						System.err.println(<span class="string">"Connectable"</span>);</span><br><span class="line">						SocketChannel clientChannel = (SocketChannel) selectionKey.channel();</span><br><span class="line">						clientChannel.finishConnect();</span><br><span class="line">						selectionKey.interestOps(SelectionKey.OP_WRITE);</span><br><span class="line">					&#125; <span class="keyword">else</span> <span class="keyword">if</span> (selectionKey.isReadable()) &#123;</span><br><span class="line">						System.out.println(<span class="string">"Readable"</span>);</span><br><span class="line">						SocketChannel channel = (SocketChannel) selectionKey.channel();</span><br><span class="line">						ByteBuffer buffer = ByteBuffer.allocate(<span class="number">128</span>);</span><br><span class="line">						channel.read(buffer);</span><br><span class="line">						selectionKey.interestOps(SelectionKey.OP_WRITE);</span><br><span class="line">						System.out.println(<span class="string">"收到服务端数据"</span> + <span class="keyword">new</span> String(buffer.array()));</span><br><span class="line">					&#125; <span class="keyword">else</span> <span class="keyword">if</span> (selectionKey.isWritable()) &#123;</span><br><span class="line">						SocketChannel clientChannel = (SocketChannel) selectionKey.channel();</span><br><span class="line">						String str = <span class="string">"qiwoo mobile"</span>;</span><br><span class="line">						ByteBuffer buffer = ByteBuffer.wrap(str.getBytes());</span><br><span class="line">						clientChannel.write(buffer);</span><br><span class="line">						selectionKey.interestOps(SelectionKey.OP_READ);</span><br><span class="line">						System.out.println(<span class="string">"向服务端发送数据"</span> + <span class="keyword">new</span> String(buffer.array()));</span><br><span class="line">						clientChannel.close(); <span class="comment">//@4</span></span><br><span class="line">					&#125;</span><br><span class="line">					iterator.remove();</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当客户端建立完连接往服务端发送数据后，会调close()方法，关闭连接，在代码@4处。我们先启动NioServer，然后再启动NioClient。会发现NioServer会报如下异常：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">[root@dev260 tmp]# java NioServer</span><br><span class="line">Acceptable</span><br><span class="line">Readable</span><br><span class="line">接收来自客户端的数据：qiwoo mobile</span><br><span class="line">Writable</span><br><span class="line">发送bufferOne</span><br><span class="line">Exception in thread <span class="string">"main"</span> java.io.IOException: 断开的管道</span><br><span class="line">	at sun.nio.ch.FileDispatcherImpl.write0(Native Method)</span><br><span class="line">	at sun.nio.ch.SocketDispatcher.write(SocketDispatcher.java:<span class="number">47</span>)</span><br><span class="line">	at sun.nio.ch.IOUtil.writeFromNativeBuffer(IOUtil.java:<span class="number">93</span>)</span><br><span class="line">	at sun.nio.ch.IOUtil.write(IOUtil.java:<span class="number">65</span>)</span><br><span class="line">	at sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:<span class="number">471</span>)</span><br><span class="line">	at NioServer.main(NioServer.java:<span class="number">48</span>)</span><br></pre></td></tr></table></figure>
+<p>而此时，我们用tcpdump抓包看的情况如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.819801</span> IP <span class="number">192.168</span>.2.11.33962 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [S], seq <span class="number">3601143964</span>, win <span class="number">14600</span>, options [mss <span class="number">1460</span>,nop,nop,sackOK,nop,wscale <span class="number">9</span>], length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.820008</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.33962: Flags [S.], seq <span class="number">3163373872</span>, ack <span class="number">3601143965</span>, win <span class="number">29200</span>, options [mss <span class="number">1460</span>,nop,nop,sackOK,nop,wscale <span class="number">9</span>], length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.820072</span> IP <span class="number">192.168</span>.2.11.33962 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [.], ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.821801</span> IP <span class="number">192.168</span>.2.11.33962 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [P.], seq <span class="number">1</span>:<span class="number">13</span>, ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">12</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.821958</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.33962: Flags [.], ack <span class="number">13</span>, win <span class="number">58</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.822097</span> IP <span class="number">192.168</span>.2.11.33962 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [F.], seq <span class="number">13</span>, ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">38.861551</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.33962: Flags [.], ack <span class="number">14</span>, win <span class="number">58</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">41.825209</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.33962: Flags [P.], seq <span class="number">1</span>:<span class="number">41</span>, ack <span class="number">14</span>, win <span class="number">58</span>, length <span class="number">40</span></span><br><span class="line"><span class="number">17</span>:<span class="number">35</span>:<span class="number">41.825223</span> IP <span class="number">192.168</span>.2.11.33962 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [R], seq <span class="number">3601143978</span>, win <span class="number">0</span>, length <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>结合上面信息，我们可以看到，在NioClient调用close()方法后，NioClient会往NioServer发送一个FIN包，而NioServer还继续往NioClient写数据，此时会收到NioClient返回的RST；接着NioServer继续往NioClient写数据，这个时候，NioServer就报了Broken pipe；</p>
+<p>现在我们将NioClient代码处@3的注释打开，然后执行同样的操作，会发现NioServer报如下异常：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">[root@dev260 tmp]# java NioServer</span><br><span class="line">Acceptable</span><br><span class="line">Readable</span><br><span class="line">接收来自客户端的数据：qiwoo mobile</span><br><span class="line">Writable</span><br><span class="line">Exception in thread <span class="string">"main"</span> java.io.IOException: Connection reset by peer</span><br><span class="line">	at sun.nio.ch.FileDispatcherImpl.write0(Native Method)</span><br><span class="line">	at sun.nio.ch.SocketDispatcher.write(SocketDispatcher.java:<span class="number">47</span>)</span><br><span class="line">	at sun.nio.ch.IOUtil.writeFromNativeBuffer(IOUtil.java:<span class="number">93</span>)</span><br><span class="line">	at sun.nio.ch.IOUtil.write(IOUtil.java:<span class="number">65</span>)</span><br><span class="line">	at sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:<span class="number">471</span>)</span><br><span class="line">	at NioServer.main(NioServer.java:<span class="number">44</span>)</span><br></pre></td></tr></table></figure>
+<p>而此时，我们用tcpdump抓包看的情况如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.234530</span> IP <span class="number">192.168</span>.2.11.34818 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [S], seq <span class="number">2138229963</span>, win <span class="number">14600</span>, options [mss <span class="number">1460</span>,nop,nop,sackOK,nop,wscale <span class="number">9</span>], length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.234728</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.34818: Flags [S.], seq <span class="number">3174262802</span>, ack <span class="number">2138229964</span>, win <span class="number">29200</span>, options [mss <span class="number">1460</span>,nop,nop,sackOK,nop,wscale <span class="number">9</span>], length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.234740</span> IP <span class="number">192.168</span>.2.11.34818 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [.], ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.295824</span> IP <span class="number">192.168</span>.2.11.34818 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [P.], seq <span class="number">1</span>:<span class="number">13</span>, ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">12</span></span><br><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.296007</span> IP <span class="number">192.168</span>.2.60.cslistener &gt; <span class="number">192.168</span>.2.11.34818: Flags [.], ack <span class="number">13</span>, win <span class="number">58</span>, length <span class="number">0</span></span><br><span class="line"><span class="number">17</span>:<span class="number">37</span>:<span class="number">12.296074</span> IP <span class="number">192.168</span>.2.11.34818 &gt; <span class="number">192.168</span>.2.60.cslistener: Flags [R.], seq <span class="number">13</span>, ack <span class="number">1</span>, win <span class="number">29</span>, length <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>结合上面信息，我们可以看到，在NioClient调用close()方法后，因为配置了soLinger选项，也即，NioClient会往NioServer发送一个RST包，而NioServer还继续往NioClient写数据，这个时候，NioServer就报了Broken pipe。</p>
+<h4 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h4><p>从上面的两个例子可以看出，对于被动关闭方来说，也就是上述例子的NioServer，有两种情况：</p>
+<h5 id="被FIN关闭"><a href="#被FIN关闭" class="headerlink" title="被FIN关闭"></a>被FIN关闭</h5><p>第一次write得到了RST响应，但不会抛异常，第二次write，就会报Broken pipe（针对Linux系统）</p>
+<h5 id="被RST关闭"><a href="#被RST关闭" class="headerlink" title="被RST关闭"></a>被RST关闭</h5><p>无论读写都会报Connection reset by peer</p>
+<h4 id="RST的场景"><a href="#RST的场景" class="headerlink" title="RST的场景"></a>RST的场景</h4><p>什么场景下会发送RST呢，网上总结的也很多，这里就不在赘述了。</p>
+<h4 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a>参考文章</h4>
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Java/" rel="tag"># Java</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/06/24/rocketmq-consume-two/" rel="next" title="RocketMQ消息消费流程源码分析(二)">
+                <i class="fa fa-chevron-left"></i> RocketMQ消息消费流程源码分析(二)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/07/08/gc-case-one/" rel="prev" title="记一次GC导致CPU飙升的排查过程">
+                记一次GC导致CPU飙升的排查过程 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/avatar.png" alt="chenwei">
+            
+              <p class="site-author-name" itemprop="name">chenwei</p>
+              <p class="site-description motion-element" itemprop="description">。。。</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#TCP的连接的建立与终止"><span class="nav-number">1.</span> <span class="nav-text">TCP的连接的建立与终止</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#异常模拟"><span class="nav-number">2.</span> <span class="nav-text">异常模拟</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#结论"><span class="nav-number">3.</span> <span class="nav-text">结论</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#被FIN关闭"><span class="nav-number">3.1.</span> <span class="nav-text">被FIN关闭</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#被RST关闭"><span class="nav-number">3.2.</span> <span class="nav-text">被RST关闭</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#RST的场景"><span class="nav-number">4.</span> <span class="nav-text">RST的场景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#参考文章"><span class="nav-number">5.</span> <span class="nav-text">参考文章</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenwei</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i> 访问人数
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i> 总访问量
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      次
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

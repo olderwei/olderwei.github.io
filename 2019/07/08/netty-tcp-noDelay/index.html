@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hello,">
+  <meta name="keywords" content="Java,">
 
 
 
@@ -79,18 +79,21 @@
 
 
 
-<meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
-<meta name="keywords" content="Hello">
+<meta name="description" content="背景同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。 排查步骤 查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。  查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。  从这里我们可以看到序号为322这个">
+<meta name="keywords" content="Java">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Hello World">
-<meta property="og:url" content="http://yoursite.com/2019/03/18/hello-world/index.html">
+<meta property="og:title" content="Netty之TcpNoDelay">
+<meta property="og:url" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/index.html">
 <meta property="og:site_name" content="olderwei">
-<meta property="og:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta property="og:description" content="背景同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。 排查步骤 查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。  查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。  从这里我们可以看到序号为322这个">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-05-05T14:32:37.657Z">
+<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png">
+<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-2.png">
+<meta property="og:updated_time" content="2019-07-08T09:37:02.646Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Hello World">
-<meta name="twitter:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="twitter:title" content="Netty之TcpNoDelay">
+<meta name="twitter:description" content="背景同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。 排查步骤 查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。  查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。  从这里我们可以看到序号为322这个">
+<meta name="twitter:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png">
 
 
 
@@ -120,13 +123,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/03/18/hello-world/">
+  <link rel="canonical" href="http://yoursite.com/2019/07/08/netty-tcp-noDelay/">
 
 
 
 
 
-  <title>Hello World | olderwei</title>
+  <title>Netty之TcpNoDelay | olderwei</title>
   
 
 
@@ -253,7 +256,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/03/18/hello-world/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/08/netty-tcp-noDelay/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="chenwei">
@@ -270,7 +273,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Hello World</h1>
+          <h1 class="post-title" itemprop="name headline">Netty之TcpNoDelay</h1>
         
 
         <div class="post-meta">
@@ -282,8 +285,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-03-18T22:37:42+08:00">
-                2019-03-18
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-08T17:28:27+08:00">
+                2019-07-08
               </time>
             
 
@@ -305,8 +308,8 @@
               
               
                 <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Hello/" itemprop="url" rel="index">
-                    <span itemprop="name">Hello</span>
+                  <a href="/categories/Java/" itemprop="url" rel="index">
+                    <span itemprop="name">Java</span>
                   </a>
                 </span>
 
@@ -347,15 +350,28 @@
       
 
       
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
+        <h3 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h3><p>同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。</p>
+<h3 id="排查步骤"><a href="#排查步骤" class="headerlink" title="排查步骤"></a>排查步骤</h3><ol>
+<li><p>查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。</p>
+</li>
+<li><p>查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。</p>
+<p><img src="/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png" alt="netty-1"></p>
+<p>从这里我们可以看到序号为322这个包发了一个GET命令到Redis服务器（其实Redis这种基于文本的协议很容看懂，大家可以参考<a href="http://doc.redisfans.com/topic/protocol.html#id3" target="_blank" rel="noopener">http://doc.redisfans.com/topic/protocol.html#id3</a>），然后Redis返回来的值没有问题，也即序号为323的包，这里我就不贴了。接着看下面<img src="/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-2.png" alt="netty-2"></p>
+<p>从这里我们看到序号为324的这个包发了三个GET命令到Reids服务器，这个时候服务器恢复的325这个包就有问题了</p>
+</li>
+<li><p>和Redis团队进行沟通，他们在Redis集群之前做了一个代理，如果收到325这种包，也就是类似于Pipeline的这种方式，他们会异步的的去处理这个包里的所有命令，然后所有结果都返回后再返回给客户端。而由于我发的这几个Key在不同的分片上，所以返回的结果就乱了。当然这可能是他们Redis集群支持的问题，可能到这里的话很多人就会说他们不支持（因为之前我测试了单机Redis，以及用Jedis客户端都没有这个问题），但是有一个问题始终困扰着我，就是为什么在324这个包里会发送多个GET命令过去，难道是我们客户端用了pipeline，所以我又跟了一遍代码。</p>
+</li>
+<li><p>跟代码的过程当中没有发现任何地方使用pipeline，而且从上面的包也可以看出，收发包始终都是一个连接，在一个连接中，netty所有的写动作都是在一个for循环里完成的（为什么会这样，后面会写Netty源码分析的文章，放在后面去说明），所以也不存在多线程的问题。后来左思右想是不是TCP协议将小包合并了呢？然后就去查相关的资料，终于豁然开朗。</p>
+</li>
+<li><p>TCP协议中有一个Nagle算法，简单点说，就是第一个包的ACK没有收到的话，后面的小包都会被整合到一个包中进行发送（具体Nagle算法的解释，请参看TCP/IP详解 卷1 15.4章节，里面有详细的介绍），这个默认都是开启的，那如何关闭呢？</p>
+</li>
+<li><p>在Netty中有一个TcpNoDelay参数，这个参数在lettuce中默认被设置为false，将它设置为true也就是禁用Nagle算法，这样的话小包就能发送了。禁用Nagle算法后，此问题没有再出现。</p>
+</li>
+</ol>
+<h3 id="说说Nagle算法"><a href="#说说Nagle算法" class="headerlink" title="说说Nagle算法"></a>说说Nagle算法</h3><p>Nagle算法的初衷是：避免发送大量的小包，防止小包泛滥与网络，而并没有阻止发送小包（完全阻止发送小包，有TCP_CORK来做控制）。这个算法的思路也是延时处理，他有两个主要的条件：1）要等到 Window Size&gt;=MSS 或是 Data Size &gt;=MSS，2）收到之前发送数据的ack回包，他才会发数据，否则就是在攒数据。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>Netty有很多参数，在使用的时候要搞清楚每个参数是什么意思，配置与不配置会产生什么样的影响，这样的话你才能更好的掌控这个计数。</p>
+<h3 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a>参考文章</h3><p><a href="https://coolshell.cn/articles/11609.html" target="_blank" rel="noopener">https://coolshell.cn/articles/11609.html</a></p>
+<p><a href="https://blog.csdn.net/dog250/article/details/21303679" target="_blank" rel="noopener">https://blog.csdn.net/dog250/article/details/21303679</a></p>
 
       
     </div>
@@ -373,7 +389,7 @@
       
         <div class="post-tags">
           
-            <a href="/tags/Hello/" rel="tag"># Hello</a>
+            <a href="/tags/Java/" rel="tag"># Java</a>
           
         </div>
       
@@ -386,15 +402,15 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
+              <a href="/2019/07/08/gc-case-one/" rel="next" title="记一次GC导致CPU飙升的排查过程">
+                <i class="fa fa-chevron-left"></i> 记一次GC导致CPU飙升的排查过程
+              </a>
+            
           </div>
 
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2019/03/26/io-rambling-one/" rel="prev" title="IO漫谈之IO模型（一）">
-                IO漫谈之IO模型（一） <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -528,7 +544,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick-Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create-a-new-post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate-static-files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy-to-remote-sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#背景"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#排查步骤"><span class="nav-number">2.</span> <span class="nav-text">排查步骤</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#说说Nagle算法"><span class="nav-number">3.</span> <span class="nav-text">说说Nagle算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#参考文章"><span class="nav-number">5.</span> <span class="nav-text">参考文章</span></a></li></ol></div>
             
 
           </div>
