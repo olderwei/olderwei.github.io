@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next pisces use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="RocketMQ,">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="本篇我们主要关注定时消费的流程。 定时消息示例Producer123456789101112131415161718192021222324public class Producer &amp;#123;    public static void main(String[] args) throws MQClientException, InterruptedException &amp;#123;">
+<meta name="keywords" content="RocketMQ">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RocketMQ消息消费流程源码分析(三)">
+<meta property="og:url" content="http://yoursite.com/2019/07/11/rocketmq-consume-three/index.html">
+<meta property="og:site_name" content="olderwei">
+<meta property="og:description" content="本篇我们主要关注定时消费的流程。 定时消息示例Producer123456789101112131415161718192021222324public class Producer &amp;#123;    public static void main(String[] args) throws MQClientException, InterruptedException &amp;#123;">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-07-16T14:32:06.470Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RocketMQ消息消费流程源码分析(三)">
+<meta name="twitter:description" content="本篇我们主要关注定时消费的流程。 定时消息示例Producer123456789101112131415161718192021222324public class Producer &amp;#123;    public static void main(String[] args) throws MQClientException, InterruptedException &amp;#123;">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Pisces',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/07/11/rocketmq-consume-three/">
+
+
+
+
+
+  <title>RocketMQ消息消费流程源码分析(三) | olderwei</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">olderwei</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">yoyo</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/11/rocketmq-consume-three/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenwei">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="olderwei">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">RocketMQ消息消费流程源码分析(三)</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-07-11T22:37:25+08:00">
+                2019-07-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/RocketMQ/" itemprop="url" rel="index">
+                    <span itemprop="name">RocketMQ</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+            <span class="post-meta-divider">|</span>
+            <span class="page-pv"><i class="fa fa-file-o"></i> 浏览
+            <span class="busuanzi-value" id="busuanzi_value_page_pv"></span>次
+            </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本篇我们主要关注定时消费的流程。</p>
+<h3 id="定时消息示例"><a href="#定时消息示例" class="headerlink" title="定时消息示例"></a>定时消息示例</h3><h4 id="Producer"><a href="#Producer" class="headerlink" title="Producer"></a>Producer</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Producer</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> MQClientException, InterruptedException </span>&#123;</span><br><span class="line">        DefaultMQProducer producer = <span class="keyword">new</span> DefaultMQProducer(<span class="string">"please_rename_unique_group_name"</span>);</span><br><span class="line">        producer.setNamesrvAddr(<span class="string">"127.0.0.1:9876"</span>);</span><br><span class="line">        producer.start();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; i++) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                Message msg = <span class="keyword">new</span> Message(<span class="string">"TopicTest_1"</span> <span class="comment">/* Topic */</span>,</span><br><span class="line">                    <span class="string">"TagA"</span> <span class="comment">/* Tag */</span>,</span><br><span class="line">                    (<span class="string">"Hello RocketMQ "</span> + i).getBytes(RemotingHelper.DEFAULT_CHARSET) <span class="comment">/* Message body */</span></span><br><span class="line">                );</span><br><span class="line">                <span class="comment">//设置定时level</span></span><br><span class="line">                msg.setDelayTimeLevel(<span class="number">3</span>);</span><br><span class="line">                SendResult sendResult = producer.send(msg);</span><br><span class="line">                System.out.printf(<span class="string">"%s%n"</span>, sendResult);</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                e.printStackTrace();</span><br><span class="line">                Thread.sleep(<span class="number">1000</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        producer.shutdown();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="Consumer"><a href="#Consumer" class="headerlink" title="Consumer"></a>Consumer</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Consumer</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException, MQClientException </span>&#123;</span><br><span class="line">        DefaultMQPushConsumer consumer = <span class="keyword">new</span> DefaultMQPushConsumer(<span class="string">"please_rename_unique_group_name_4"</span>);</span><br><span class="line">        <span class="comment">//设置NameServer的地址</span></span><br><span class="line">        consumer.setNamesrvAddr(<span class="string">"127.0.0.1:9876"</span>);</span><br><span class="line">        <span class="comment">//设置从哪开始消息，CONSUME_FROM_FIRST_OFFSET：从队列当前最小偏移量开始消费，CONSUME_FROM_LAST_OFFSET：从队列当前最大偏移量开始消费，CONSUME_FROM_TIMESTAMP：从消费者启动时间戳开始消费</span></span><br><span class="line">        consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);</span><br><span class="line">        <span class="comment">//订阅主题，subExpression：消息过滤表达式，TAG或者是SQL92表达式</span></span><br><span class="line">        consumer.subscribe(<span class="string">"TopicTest_1"</span>, <span class="string">"*"</span>);</span><br><span class="line">        <span class="comment">//注册并发消费消息的事件监听器</span></span><br><span class="line">        consumer.registerMessageListener(<span class="keyword">new</span> MessageListenerConcurrently() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> ConsumeConcurrentlyStatus <span class="title">consumeMessage</span><span class="params">(List&lt;MessageExt&gt; msgs,</span></span></span><br><span class="line"><span class="function"><span class="params">                ConsumeConcurrentlyContext context)</span> </span>&#123;</span><br><span class="line">                <span class="comment">//消费消息</span></span><br><span class="line">                <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; msgs.size(); i++) &#123;</span><br><span class="line">                    System.out.printf(<span class="string">"%s Receive New Messages: %s %n"</span>, Thread.currentThread().getName(), msgs.get(i));</span><br><span class="line">                    <span class="keyword">return</span> ConsumeConcurrentlyStatus.CONSUME_SUCCESS;</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">return</span> ConsumeConcurrentlyStatus.CONSUME_SUCCESS;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">        <span class="comment">//启动consumer</span></span><br><span class="line">        consumer.start();</span><br><span class="line">        System.out.printf(<span class="string">"Consumer Started.%n"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>目前Rokect MQ支持的延迟时间有</p>
+<blockquote>
+<p>1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h</p>
+</blockquote>
+<p>对应的延迟级别有，从1到18共18个延迟级别</p>
+<blockquote>
+<p>1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17  18</p>
+</blockquote>
+<p>Rocket MQ不支持任意时间精度的延迟消息</p>
+<h4 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h4><p>延迟消息的核心思路是：当消息设置了DELAY这个属性后(也即setDelayTimeLevel())，由producer发出以后，在broker端都会存到一个Topic下即SCHEDULE_TOPIC_XXXX，不同的延迟级别会对应不同的队列。当延迟时间到了，由定时线程读取该队列的消息，然后转换成真实的TOPIC以及队列中，相应的consumer才会消费。下面我们来看具体实现。</p>
+<h3 id="消息存储"><a href="#消息存储" class="headerlink" title="消息存储"></a>消息存储</h3><p>由于在消息存储流程中我们具体分析过，这里不在赘述，可以参看RocketMQ消息存储流程源码分析(一)，我们直接看和定时消息相关的代码。</p>
+<h4 id="CommitLog"><a href="#CommitLog" class="headerlink" title="CommitLog"></a>CommitLog</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">CommitLog</span> </span>&#123;</span><br><span class="line">		<span class="function"><span class="keyword">public</span> PutMessageResult <span class="title">putMessage</span><span class="params">(<span class="keyword">final</span> MessageExtBrokerInner msg)</span> </span>&#123;</span><br><span class="line">				<span class="comment">//省略代码</span></span><br><span class="line">		    <span class="comment">//获取消息类型</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());</span><br><span class="line">        <span class="comment">//如果是非事务消息或者是事务消息的Commit消息</span></span><br><span class="line">        <span class="keyword">if</span> (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE</span><br><span class="line">            || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) &#123;</span><br><span class="line">            <span class="comment">// 获取延迟级别</span></span><br><span class="line">            <span class="keyword">if</span> (msg.getDelayTimeLevel() &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">if</span> (msg.getDelayTimeLevel() &gt; <span class="keyword">this</span>.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) &#123;</span><br><span class="line">                    msg.setDelayTimeLevel(<span class="keyword">this</span>.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">//将Topic修改为SCHEDULE_TOPIC_XXXX，队列ID修改为延迟级别-1</span></span><br><span class="line">                topic = ScheduleMessageService.SCHEDULE_TOPIC;</span><br><span class="line">                queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());</span><br><span class="line"></span><br><span class="line">                <span class="comment">// 保存真实的Topic即队列ID</span></span><br><span class="line">                MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());</span><br><span class="line">                MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));</span><br><span class="line">                msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));</span><br><span class="line"></span><br><span class="line">                msg.setTopic(topic);</span><br><span class="line">                msg.setQueueId(queueId);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//省略代码。。。</span></span><br><span class="line">		&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="定时消费"><a href="#定时消费" class="headerlink" title="定时消费"></a>定时消费</h3><h4 id="ScheduleMessageService"><a href="#ScheduleMessageService" class="headerlink" title="ScheduleMessageService"></a>ScheduleMessageService</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br><span class="line">210</span><br><span class="line">211</span><br><span class="line">212</span><br><span class="line">213</span><br><span class="line">214</span><br><span class="line">215</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ScheduleMessageService</span> <span class="keyword">extends</span> <span class="title">ConfigManager</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//在DefaultMessageStore的load方法中调用</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">load</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">boolean</span> result = <span class="keyword">super</span>.load();</span><br><span class="line">        <span class="comment">//解析延迟级别,见parseDelayLevel的分析</span></span><br><span class="line">        result = result &amp;&amp; <span class="keyword">this</span>.parseDelayLevel();</span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">parseDelayLevel</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        HashMap&lt;String, Long&gt; timeUnitTable = <span class="keyword">new</span> HashMap&lt;String, Long&gt;();</span><br><span class="line">        timeUnitTable.put(<span class="string">"s"</span>, <span class="number">1000L</span>);</span><br><span class="line">        timeUnitTable.put(<span class="string">"m"</span>, <span class="number">1000L</span> * <span class="number">60</span>);</span><br><span class="line">        timeUnitTable.put(<span class="string">"h"</span>, <span class="number">1000L</span> * <span class="number">60</span> * <span class="number">60</span>);</span><br><span class="line">        timeUnitTable.put(<span class="string">"d"</span>, <span class="number">1000L</span> * <span class="number">60</span> * <span class="number">60</span> * <span class="number">24</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//获取延时时间，延迟时间为"1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h"</span></span><br><span class="line">        String levelString = <span class="keyword">this</span>.defaultMessageStore.getMessageStoreConfig().getMessageDelayLevel();</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="comment">//循环进行解析，并将延迟级别: 延迟时间放到map中去，如1:1s  2:5s</span></span><br><span class="line">            String[] levelArray = levelString.split(<span class="string">" "</span>);</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; levelArray.length; i++) &#123;</span><br><span class="line">                String value = levelArray[i];</span><br><span class="line">                String ch = value.substring(value.length() - <span class="number">1</span>);</span><br><span class="line">                Long tu = timeUnitTable.get(ch);</span><br><span class="line"></span><br><span class="line">                <span class="keyword">int</span> level = i + <span class="number">1</span>;</span><br><span class="line">                <span class="keyword">if</span> (level &gt; <span class="keyword">this</span>.maxDelayLevel) &#123;</span><br><span class="line">                    <span class="keyword">this</span>.maxDelayLevel = level;</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">long</span> num = Long.parseLong(value.substring(<span class="number">0</span>, value.length() - <span class="number">1</span>));</span><br><span class="line">                <span class="keyword">long</span> delayTimeMillis = tu * num;</span><br><span class="line">                <span class="keyword">this</span>.delayLevelTable.put(level, delayTimeMillis);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            log.error(<span class="string">"parseDelayLevel exception"</span>, e);</span><br><span class="line">            log.info(<span class="string">"levelString String = &#123;&#125;"</span>, levelString);</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125; </span><br><span class="line">  </span><br><span class="line">    <span class="comment">//定时任务启动</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">start</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="comment">//循环遍历delayLevelTable(在parseDelayLevel方法中填充值)</span></span><br><span class="line">        <span class="keyword">for</span> (Map.Entry&lt;Integer, Long&gt; entry : <span class="keyword">this</span>.delayLevelTable.entrySet()) &#123;</span><br><span class="line">            Integer level = entry.getKey();</span><br><span class="line">            Long timeDelay = entry.getValue();</span><br><span class="line">            Long offset = <span class="keyword">this</span>.offsetTable.get(level);</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">null</span> == offset) &#123;</span><br><span class="line">                offset = <span class="number">0L</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//每一个延迟级别都会有一个定时器来执行TimerTask</span></span><br><span class="line">            <span class="keyword">if</span> (timeDelay != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">this</span>.timer.schedule(<span class="keyword">new</span> DeliverDelayedMessageTimerTask(level, offset), FIRST_DELAY_TIME);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//每10s钟将延迟队列扫描处理的进度持久化到delayOffset.json文件中。</span></span><br><span class="line">        <span class="keyword">this</span>.timer.scheduleAtFixedRate(<span class="keyword">new</span> TimerTask() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    ScheduleMessageService.<span class="keyword">this</span>.persist();</span><br><span class="line">                &#125; <span class="keyword">catch</span> (Throwable e) &#123;</span><br><span class="line">                    log.error(<span class="string">"scheduleAtFixedRate flush exception"</span>, e);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;, <span class="number">10000</span>, <span class="keyword">this</span>.defaultMessageStore.getMessageStoreConfig().getFlushDelayOffsetInterval());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">class</span> <span class="title">DeliverDelayedMessageTimerTask</span> <span class="keyword">extends</span> <span class="title">TimerTask</span> </span>&#123;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> delayLevel;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">long</span> offset;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="title">DeliverDelayedMessageTimerTask</span><span class="params">(<span class="keyword">int</span> delayLevel, <span class="keyword">long</span> offset)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">this</span>.delayLevel = delayLevel;</span><br><span class="line">            <span class="keyword">this</span>.offset = offset;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="keyword">this</span>.executeOnTimeup();</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                <span class="comment">// <span class="doctag">XXX:</span> warn and notify me</span></span><br><span class="line">                log.error(<span class="string">"ScheduleMessageService, executeOnTimeup exception"</span>, e);</span><br><span class="line">                ScheduleMessageService.<span class="keyword">this</span>.timer.schedule(<span class="keyword">new</span> DeliverDelayedMessageTimerTask(</span><br><span class="line">                    <span class="keyword">this</span>.delayLevel, <span class="keyword">this</span>.offset), DELAY_FOR_A_PERIOD);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">private</span> <span class="keyword">long</span> <span class="title">correctDeliverTimestamp</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> now, <span class="keyword">final</span> <span class="keyword">long</span> deliverTimestamp)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">long</span> result = deliverTimestamp;</span><br><span class="line">            <span class="keyword">long</span> maxTimestamp = now + ScheduleMessageService.<span class="keyword">this</span>.delayLevelTable.get(<span class="keyword">this</span>.delayLevel);</span><br><span class="line">            <span class="keyword">if</span> (deliverTimestamp &gt; maxTimestamp) &#123;</span><br><span class="line">                result = now;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> result;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">executeOnTimeup</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="comment">//获取定时任务消费队列ConsumeQueue</span></span><br><span class="line">            ConsumeQueue cq =</span><br><span class="line">             ScheduleMessageService.<span class="keyword">this</span>.defaultMessageStore.findConsumeQueue(SCHEDULE_TOPIC,</span><br><span class="line">                    delayLevel2QueueId(delayLevel));</span><br><span class="line">            <span class="keyword">long</span> failScheduleOffset = offset;</span><br><span class="line">            <span class="keyword">if</span> (cq != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="comment">//取出ConsumeQueue偏移量为offset的数据，包含多条消息</span></span><br><span class="line">                SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(<span class="keyword">this</span>.offset);</span><br><span class="line">                <span class="keyword">if</span> (bufferCQ != <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="keyword">try</span> &#123;</span><br><span class="line">                        <span class="keyword">long</span> nextOffset = offset;</span><br><span class="line">                        <span class="keyword">int</span> i = <span class="number">0</span>;</span><br><span class="line">                        ConsumeQueueExt.CqExtUnit cqExtUnit = <span class="keyword">new</span> ConsumeQueueExt.CqExtUnit();</span><br><span class="line">                        <span class="comment">//循环执行</span></span><br><span class="line">                        <span class="keyword">for</span> (; i &lt; bufferCQ.getSize(); i += ConsumeQueue.CQ_STORE_UNIT_SIZE) &#123;</span><br><span class="line">                            <span class="keyword">long</span> offsetPy = bufferCQ.getByteBuffer().getLong();</span><br><span class="line">                            <span class="keyword">int</span> sizePy = bufferCQ.getByteBuffer().getInt();</span><br><span class="line">                            <span class="keyword">long</span> tagsCode = bufferCQ.getByteBuffer().getLong();</span><br><span class="line">                            <span class="comment">//tagsCode和时间有关？？？在构建ConsumeQueue的时候，如果未定时消息，则会将tagsCode转换成到期的时间戳</span></span><br><span class="line">                            <span class="keyword">if</span> (cq.isExtAddr(tagsCode)) &#123;</span><br><span class="line">                                <span class="keyword">if</span> (cq.getExt(tagsCode, cqExtUnit)) &#123;</span><br><span class="line">                                    tagsCode = cqExtUnit.getTagsCode();</span><br><span class="line">                                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                                    <span class="comment">//can't find ext content.So re compute tags code.</span></span><br><span class="line">                                    log.error(<span class="string">"[BUG] can't find consume queue extend file content!addr=&#123;&#125;, offsetPy=&#123;&#125;, sizePy=&#123;&#125;"</span>,</span><br><span class="line">                                        tagsCode, offsetPy, sizePy);</span><br><span class="line">                                    <span class="keyword">long</span> msgStoreTime = defaultMessageStore.getCommitLog().pickupStoreTimestamp(offsetPy, sizePy);</span><br><span class="line">                                    tagsCode = computeDeliverTimestamp(delayLevel, msgStoreTime);</span><br><span class="line">                                &#125;</span><br><span class="line">                            &#125;</span><br><span class="line"></span><br><span class="line">                            <span class="keyword">long</span> now = System.currentTimeMillis();</span><br><span class="line">                            <span class="keyword">long</span> deliverTimestamp = <span class="keyword">this</span>.correctDeliverTimestamp(now, tagsCode);</span><br><span class="line"></span><br><span class="line">                            nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);</span><br><span class="line">                            <span class="keyword">long</span> countdown = deliverTimestamp - now;</span><br><span class="line">                            <span class="comment">//如果已经到期了，则恢复Topic及队列ID重新写入CommitLog；如果未到期，则过countdown再执行此定时任务</span></span><br><span class="line">                            <span class="keyword">if</span> (countdown &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">                                <span class="comment">//查询消息</span></span><br><span class="line">                                MessageExt msgExt =</span><br><span class="line">                                    ScheduleMessageService.<span class="keyword">this</span>.defaultMessageStore.lookMessageByOffset(</span><br><span class="line">                                        offsetPy, sizePy);</span><br><span class="line">                                <span class="comment">//如果消息不为空，则将消息转换成MessageExtBrokerInner，也即恢复之前的Topic及队列ID，再写入到commitlog里</span></span><br><span class="line">                                <span class="keyword">if</span> (msgExt != <span class="keyword">null</span>) &#123;</span><br><span class="line">                                    <span class="keyword">try</span> &#123;</span><br><span class="line">                                        MessageExtBrokerInner msgInner = <span class="keyword">this</span>.messageTimeup(msgExt);</span><br><span class="line">                                        PutMessageResult putMessageResult =</span><br><span class="line">                                            ScheduleMessageService.<span class="keyword">this</span>.defaultMessageStore</span><br><span class="line">                                                .putMessage(msgInner);</span><br><span class="line">                                        <span class="comment">//如果写成功了，则继续写吓一条消息</span></span><br><span class="line">                                        <span class="keyword">if</span> (putMessageResult != <span class="keyword">null</span></span><br><span class="line">                                            &amp;&amp; putMessageResult.getPutMessageStatus() == PutMessageStatus.PUT_OK) &#123;</span><br><span class="line">                                            <span class="keyword">continue</span>;</span><br><span class="line">                                        <span class="comment">//如果写失败了，则10s后再执行此定时任务</span></span><br><span class="line">                                        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                                            <span class="comment">// <span class="doctag">XXX:</span> warn and notify me</span></span><br><span class="line">                                            log.error(</span><br><span class="line">                                                <span class="string">"ScheduleMessageService, a message time up, but reput it failed, topic: &#123;&#125; msgId &#123;&#125;"</span>,</span><br><span class="line">                                                msgExt.getTopic(), msgExt.getMsgId());</span><br><span class="line">                                            ScheduleMessageService.<span class="keyword">this</span>.timer.schedule(</span><br><span class="line">                                                <span class="keyword">new</span> DeliverDelayedMessageTimerTask(<span class="keyword">this</span>.delayLevel,</span><br><span class="line">                                                    nextOffset), DELAY_FOR_A_PERIOD);</span><br><span class="line">                                            ScheduleMessageService.<span class="keyword">this</span>.updateOffset(<span class="keyword">this</span>.delayLevel,</span><br><span class="line">                                                nextOffset);</span><br><span class="line">                                            <span class="keyword">return</span>;</span><br><span class="line">                                        &#125;</span><br><span class="line">                                    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">                                        <span class="comment">/*</span></span><br><span class="line"><span class="comment">                                         * <span class="doctag">XXX:</span> warn and notify me</span></span><br><span class="line"><span class="comment">                                         */</span></span><br><span class="line">                                        log.error(</span><br><span class="line">                                            <span class="string">"ScheduleMessageService, messageTimeup execute error, drop it. msgExt="</span></span><br><span class="line">                                                + msgExt + <span class="string">", nextOffset="</span> + nextOffset + <span class="string">",offsetPy="</span></span><br><span class="line">                                                + offsetPy + <span class="string">",sizePy="</span> + sizePy, e);</span><br><span class="line">                                    &#125;</span><br><span class="line">                                &#125;</span><br><span class="line">                            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                                ScheduleMessageService.<span class="keyword">this</span>.timer.schedule(</span><br><span class="line">                                    <span class="keyword">new</span> DeliverDelayedMessageTimerTask(<span class="keyword">this</span>.delayLevel, nextOffset),</span><br><span class="line">                                    countdown);</span><br><span class="line">                                ScheduleMessageService.<span class="keyword">this</span>.updateOffset(<span class="keyword">this</span>.delayLevel, nextOffset);</span><br><span class="line">                                <span class="keyword">return</span>;</span><br><span class="line">                            &#125;</span><br><span class="line">                        &#125; <span class="comment">// end of for</span></span><br><span class="line">                        <span class="comment">//全部执行完以后，则100ms后再执行此定时任务</span></span><br><span class="line">                        nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);</span><br><span class="line">                        ScheduleMessageService.<span class="keyword">this</span>.timer.schedule(<span class="keyword">new</span> DeliverDelayedMessageTimerTask(</span><br><span class="line">                            <span class="keyword">this</span>.delayLevel, nextOffset), DELAY_FOR_A_WHILE);</span><br><span class="line">                        ScheduleMessageService.<span class="keyword">this</span>.updateOffset(<span class="keyword">this</span>.delayLevel, nextOffset);</span><br><span class="line">                        <span class="keyword">return</span>;</span><br><span class="line">                    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line"></span><br><span class="line">                        bufferCQ.release();</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125; <span class="comment">// end of if (bufferCQ != null)</span></span><br><span class="line">                <span class="comment">//如果根据offset未取到SelectMappedBufferResult，则纠正下次定时任务的offset为当前定时任务队列的最小值</span></span><br><span class="line">                <span class="keyword">else</span> &#123;</span><br><span class="line"></span><br><span class="line">                    <span class="keyword">long</span> cqMinOffset = cq.getMinOffsetInQueue();</span><br><span class="line">                    <span class="keyword">if</span> (offset &lt; cqMinOffset) &#123;</span><br><span class="line">                        failScheduleOffset = cqMinOffset;</span><br><span class="line">                        log.error(<span class="string">"schedule CQ offset invalid. offset="</span> + offset + <span class="string">", cqMinOffset="</span></span><br><span class="line">                            + cqMinOffset + <span class="string">", queueId="</span> + cq.getQueueId());</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125; <span class="comment">// end of if (cq != null)</span></span><br><span class="line"></span><br><span class="line">            ScheduleMessageService.<span class="keyword">this</span>.timer.schedule(<span class="keyword">new</span> DeliverDelayedMessageTimerTask(<span class="keyword">this</span>.delayLevel,</span><br><span class="line">                failScheduleOffset), DELAY_FOR_A_WHILE);</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>消息写入到CommitLog之后，就会执行正常的如构建ConsumeQueue等，消费端就可以进行消费了。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/RocketMQ/" rel="tag"># RocketMQ</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/07/08/netty-tcp-noDelay/" rel="next" title="Netty之TcpNoDelay">
+                <i class="fa fa-chevron-left"></i> Netty之TcpNoDelay
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/07/16/rocketmq-consume-four/" rel="prev" title="RocketMQ消息消费流程源码分析(四)">
+                RocketMQ消息消费流程源码分析(四) <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/avatar.png" alt="chenwei">
+            
+              <p class="site-author-name" itemprop="name">chenwei</p>
+              <p class="site-description motion-element" itemprop="description">。。。</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">13</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#定时消息示例"><span class="nav-number">1.</span> <span class="nav-text">定时消息示例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Producer"><span class="nav-number">1.1.</span> <span class="nav-text">Producer</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Consumer"><span class="nav-number">1.2.</span> <span class="nav-text">Consumer</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#实现原理"><span class="nav-number">1.3.</span> <span class="nav-text">实现原理</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#消息存储"><span class="nav-number">2.</span> <span class="nav-text">消息存储</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CommitLog"><span class="nav-number">2.1.</span> <span class="nav-text">CommitLog</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#定时消费"><span class="nav-number">3.</span> <span class="nav-text">定时消费</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#ScheduleMessageService"><span class="nav-number">3.1.</span> <span class="nav-text">ScheduleMessageService</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenwei</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Pisces</a> v5.1.4</div>
+
+
+
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv">
+      <i class="fa fa-user"></i> 访问人数
+      <span class="busuanzi-value" id="busuanzi_value_site_uv"></span>
+      
+    </span>
+  
+
+  
+    <span class="site-pv">
+      <i class="fa fa-eye"></i> 总访问量
+      <span class="busuanzi-value" id="busuanzi_value_site_pv"></span>
+      次
+    </span>
+  
+</div>
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

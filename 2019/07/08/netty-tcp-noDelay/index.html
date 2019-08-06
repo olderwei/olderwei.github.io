@@ -87,13 +87,13 @@
 <meta property="og:site_name" content="olderwei">
 <meta property="og:description" content="背景同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。 排查步骤 查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。  查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。  从这里我们可以看到序号为322这个">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png">
-<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-2.png">
-<meta property="og:updated_time" content="2019-07-08T09:37:02.646Z">
+<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/netty-1.png">
+<meta property="og:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/netty-2.png">
+<meta property="og:updated_time" content="2019-08-06T14:52:07.084Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Netty之TcpNoDelay">
 <meta name="twitter:description" content="背景同事在使用spring-data-redis的时候，且连接的是公司基础服务搭建的Redis集群，多线程去get值的时候，结果会出现乱序的情况。 排查步骤 查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。  查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。  从这里我们可以看到序号为322这个">
-<meta name="twitter:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png">
+<meta name="twitter:image" content="http://yoursite.com/2019/07/08/netty-tcp-noDelay/netty-1.png">
 
 
 
@@ -355,8 +355,8 @@
 <li><p>查看源码，spring-data-redis默认会使用lettuce这个redis客户端，而lettuce底层又使用了netty作为通讯组件。</p>
 </li>
 <li><p>查看收发包的情况，看是否在TCP这一层值是否就已经乱序了。</p>
-<p><img src="/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-1.png" alt="netty-1"></p>
-<p>从这里我们可以看到序号为322这个包发了一个GET命令到Redis服务器（其实Redis这种基于文本的协议很容看懂，大家可以参考<a href="http://doc.redisfans.com/topic/protocol.html#id3" target="_blank" rel="noopener">http://doc.redisfans.com/topic/protocol.html#id3</a>），然后Redis返回来的值没有问题，也即序号为323的包，这里我就不贴了。接着看下面<img src="/2019/07/08/netty-tcp-noDelay/data/blog/source/_posts/netty-tcp-noDelay/netty-2.png" alt="netty-2"></p>
+<p><img src="/2019/07/08/netty-tcp-noDelay/netty-1.png" alt="netty-1"></p>
+<p>从这里我们可以看到序号为322这个包发了一个GET命令到Redis服务器（其实Redis这种基于文本的协议很容看懂，大家可以参考<a href="http://doc.redisfans.com/topic/protocol.html#id3" target="_blank" rel="noopener">http://doc.redisfans.com/topic/protocol.html#id3</a>），然后Redis返回来的值没有问题，也即序号为323的包，这里我就不贴了。接着看下面<img src="/2019/07/08/netty-tcp-noDelay/netty-2.png" alt="netty-2"></p>
 <p>从这里我们看到序号为324的这个包发了三个GET命令到Reids服务器，这个时候服务器恢复的325这个包就有问题了</p>
 </li>
 <li><p>和Redis团队进行沟通，他们在Redis集群之前做了一个代理，如果收到325这种包，也就是类似于Pipeline的这种方式，他们会异步的的去处理这个包里的所有命令，然后所有结果都返回后再返回给客户端。而由于我发的这几个Key在不同的分片上，所以返回的结果就乱了。当然这可能是他们Redis集群支持的问题，可能到这里的话很多人就会说他们不支持（因为之前我测试了单机Redis，以及用Jedis客户端都没有这个问题），但是有一个问题始终困扰着我，就是为什么在324这个包里会发送多个GET命令过去，难道是我们客户端用了pipeline，所以我又跟了一遍代码。</p>
@@ -411,6 +411,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/07/11/rocketmq-consume-three/" rel="prev" title="RocketMQ消息消费流程源码分析(三)">
+                RocketMQ消息消费流程源码分析(三) <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -489,7 +493,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-count">13</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
